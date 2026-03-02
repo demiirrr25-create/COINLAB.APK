@@ -229,7 +229,8 @@ class MarketViewModel @Inject constructor(
                         }
                     } catch (_: Exception) { }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isWebSocketConnected = false) }
             }
         }

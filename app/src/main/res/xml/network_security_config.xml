@@ -3,7 +3,14 @@
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">api.coingecko.com</domain>
         <domain includeSubdomains="true">min-api.cryptocompare.com</domain>
+        <domain includeSubdomains="true">api.binance.com</domain>
+        <domain includeSubdomains="true">api1.binance.com</domain>
+        <domain includeSubdomains="true">api2.binance.com</domain>
+        <domain includeSubdomains="true">api3.binance.com</domain>
+        <domain includeSubdomains="true">api4.binance.com</domain>
         <domain includeSubdomains="true">stream.binance.com</domain>
+        <domain includeSubdomains="true">api.alternative.me</domain>
+        <domain includeSubdomains="true">api.github.com</domain>
         <domain includeSubdomains="true">coinlabtr.com</domain>
     </domain-config>
 </network-security-config>

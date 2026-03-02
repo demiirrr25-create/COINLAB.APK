@@ -106,7 +106,7 @@ class StakingViewModel @Inject constructor(
             "Binance" to (13.0 to 18.0), "Coinbase" to (10.0 to 14.0), "Kraken" to (11.0 to 15.0),
             "Bybit" to (14.0 to 19.0), "OKX" to (12.0 to 16.0), "KuCoin" to (13.5 to 18.0)
         ),
-        "matic-network" to mapOf(
+        "polygon-ecosystem-token" to mapOf(
             "Binance" to (3.0 to 5.0), "Coinbase" to (2.5 to 4.0), "Kraken" to (3.0 to 4.5),
             "Bybit" to (3.5 to 5.5), "OKX" to (3.0 to 4.8), "KuCoin" to (3.2 to 5.2)
         ),

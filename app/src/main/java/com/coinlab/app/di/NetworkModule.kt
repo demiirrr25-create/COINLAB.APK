@@ -6,6 +6,7 @@ import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.data.remote.api.CryptoCompareApi
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.data.remote.api.GitHubApi
+import com.coinlab.app.data.remote.interceptor.BinanceFallbackInterceptor
 import com.coinlab.app.data.remote.interceptor.RateLimitInterceptor
 import dagger.Module
 import dagger.Provides
@@ -53,17 +54,14 @@ object NetworkModule {
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
                     .addHeader("Accept", "application/json")
-                // Only add CoinGecko API key for CoinGecko requests
-                val host = originalRequest.url.host
-                if (host.contains("coingecko")) {
-                    requestBuilder.addHeader("x-cg-demo-api-key", "CG-FHpn2gST1GXaShKC3Utfn7NU")
-                }
+                // CoinGecko public API works without key (10-30 req/min)
+                // Do NOT send expired/invalid demo keys — they cause HTTP 401
                 chain.proceed(requestBuilder.build())
             }
             .connectionPool(connectionPool)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }
@@ -73,6 +71,7 @@ object NetworkModule {
     @Named("binance_http")
     fun provideBinanceOkHttpClient(connectionPool: ConnectionPool): OkHttpClient {
         return OkHttpClient.Builder()
+            .addInterceptor(BinanceFallbackInterceptor())
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .addHeader("Accept", "application/json")
@@ -80,8 +79,8 @@ object NetworkModule {
                 chain.proceed(request)
             }
             .connectionPool(connectionPool)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }

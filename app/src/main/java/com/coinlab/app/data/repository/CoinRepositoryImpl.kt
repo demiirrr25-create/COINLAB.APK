@@ -5,6 +5,7 @@ import com.coinlab.app.data.local.dao.WatchlistDao
 import com.coinlab.app.data.local.entity.CoinEntity
 import com.coinlab.app.data.local.entity.WatchlistEntity
 import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.StaticFallbackData
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
@@ -54,17 +55,22 @@ class CoinRepositoryImpl @Inject constructor(
 
             // PRIMARY: Fetch from Binance (no API key, fast, reliable)
             val coins = fetchCoinsFromBinance(perPage)
-            if (coins.isNotEmpty()) {
+            if (coins != null && coins.isNotEmpty()) {
                 // Cache results
                 if (page == 1) {
-                    coinDao.deleteAll()
-                    coinDao.insertAll(coins.map { it.toEntity() })
+                    try {
+                        coinDao.deleteAll()
+                        coinDao.insertAll(coins.map { it.toEntity() })
+                    } catch (e: Exception) {
+                        android.util.Log.w("CoinRepo", "Room cache write failed: ${e.message}")
+                        // Don't fail the request just because caching failed
+                    }
                 }
                 emit(Result.success(coins))
                 return@flow
             }
 
-            // FALLBACK: CoinGecko
+            // FALLBACK: CoinGecko (public API, no key needed)
             val response = api.getCoins(
                 currency = currency,
                 orderBy = orderBy,
@@ -85,20 +91,27 @@ class CoinRepositoryImpl @Inject constructor(
                 if (entities.isNotEmpty()) {
                     emit(Result.success(entities.map { it.toDomain() }))
                 } else {
-                    emit(Result.failure(e))
+                    // Last resort: static hardcoded data so user never sees empty/error screen
+                    android.util.Log.w("CoinRepo", "All sources failed, using static fallback: ${e.message}")
+                    emit(Result.success(StaticFallbackData.getDefaultCoins()))
                 }
             } catch (_: Exception) {
-                emit(Result.failure(e))
+                // Even Room failed — serve static data
+                android.util.Log.w("CoinRepo", "Room + all APIs failed, static fallback: ${e.message}")
+                emit(Result.success(StaticFallbackData.getDefaultCoins()))
             }
         }
     }
 
     /**
-     * Fetch coin data from Binance 24hr ticker — no API key needed, very fast
+     * Fetch coin data from Binance 24hr ticker — no API key needed, very fast.
+     * Returns null on network/parsing failure so the caller can distinguish
+     * "no data" from "Binance not available" and act accordingly.
      */
-    private suspend fun fetchCoinsFromBinance(limit: Int): List<Coin> {
+    private suspend fun fetchCoinsFromBinance(limit: Int): List<Coin>? {
         return try {
             val tickers = tickerCache.getTickers()
+            if (tickers.isEmpty()) return null // Binance unreachable — signal caller
 
             tickers.mapNotNull { ticker ->
                     val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: return@mapNotNull null)
@@ -134,8 +147,9 @@ class CoinRepositoryImpl @Inject constructor(
                 .distinctBy { it.id }
                 .sortedBy { it.marketCapRank }
                 .take(limit)
-        } catch (_: Exception) {
-            emptyList()
+        } catch (e: Exception) {
+            android.util.Log.w("CoinRepo", "Binance fetch failed: ${e.message}")
+            null // Signal failure so CoinGecko fallback is tried
         }
     }
 
@@ -156,6 +170,7 @@ class CoinRepositoryImpl @Inject constructor(
         "chainlink" -> 630_000_000.0
         "shiba-inu" -> 589_000_000_000_000.0
         "matic-network" -> 10_000_000_000.0
+        "polygon-ecosystem-token" -> 10_000_000_000.0
         "litecoin" -> 75_000_000.0
         "uniswap" -> 600_000_000.0
         "cosmos" -> 390_000_000.0
@@ -339,6 +354,20 @@ class CoinRepositoryImpl @Inject constructor(
             // Use cached tickers (shared, ~50 items)
             val tickers = tickerCache.getTickers()
 
+            // If Binance is unreachable, fall back to Room cache sorted by change%
+            if (tickers.isEmpty()) {
+                val entities = coinDao.getAllCoins().first()
+                if (entities.isNotEmpty()) {
+                    val coins = entities.map { it.toDomain() }
+                        .sortedByDescending { it.priceChangePercentage24h }
+                        .take(10)
+                    emit(Result.success(coins))
+                } else {
+                    emit(Result.success(StaticFallbackData.getDefaultCoins().take(10)))
+                }
+                return@flow
+            }
+
             val trending = tickers
                 .sortedByDescending { it.priceChangePercent?.toDoubleOrNull() ?: 0.0 }
                 .take(10)
@@ -385,6 +414,15 @@ class CoinRepositoryImpl @Inject constructor(
             }
             // Get from cached tickers
             val tickerMap = tickerCache.getTickerMap()
+
+            // If Binance is unreachable, fall back to Room cache for watchlist coins
+            if (tickerMap.isEmpty()) {
+                val entities = coinDao.getAllCoins().first()
+                val cached = entities.map { it.toDomain() }.filter { it.id in watchlistIds }
+                emit(Result.success(cached))
+                return@flow
+            }
+
             val coins = watchlistIds.mapNotNull { coinId ->
                 val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: return@mapNotNull null
                 val ticker = tickerMap[binanceSymbol] ?: return@mapNotNull null

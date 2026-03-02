@@ -85,7 +85,11 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (isAuthenticated || !biometricRequired) {
+                    if (!prefsLoaded) {
+                        // Don't render NavHost until prefs are loaded;
+                        // splash screen covers the window during this time.
+                        Box(modifier = Modifier.fillMaxSize())
+                    } else if (isAuthenticated || !biometricRequired) {
                         CoinLabNavHost(deepLinkCoinId = deepLinkCoinId, autoLogin = autoLogin)
                     } else {
                         // Lock screen

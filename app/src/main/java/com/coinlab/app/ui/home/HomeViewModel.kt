@@ -198,6 +198,14 @@ class HomeViewModel @Inject constructor(
         "cardano" -> 36_000_000_000.0
         "dogecoin" -> 147_000_000_000.0
         "tron" -> 86_000_000_000.0
+        "polygon-ecosystem-token" -> 10_000_000_000.0
+        "polkadot" -> 1_500_000_000.0
+        "avalanche-2" -> 410_000_000.0
+        "chainlink" -> 630_000_000.0
+        "shiba-inu" -> 589_000_000_000_000.0
+        "litecoin" -> 75_000_000.0
+        "near" -> 1_200_000_000.0
+        "stellar" -> 30_000_000_000.0
         else -> 1_000_000_000.0
     }
 
@@ -230,7 +238,8 @@ class HomeViewModel @Inject constructor(
                         }
                     } catch (_: Exception) { }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isWebSocketConnected = false) }
             }
         }
