@@ -8,10 +8,11 @@ import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.MarketChart
 import com.coinlab.app.domain.repository.CoinRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,6 +41,9 @@ class CoinComparisonViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ComparisonUiState())
     val uiState: StateFlow<ComparisonUiState> = _uiState.asStateFlow()
 
+    private var comparisonJob: Job? = null
+    private var coinListJob: Job? = null
+
     init {
         viewModelScope.launch {
             val currency = userPreferences.currency.first()
@@ -50,15 +54,19 @@ class CoinComparisonViewModel @Inject constructor(
     }
 
     private fun loadCoinList() {
-        viewModelScope.launch {
-            coinRepository.getCoins(
-                currency = _uiState.value.currency.lowercase(),
-                perPage = 100
-            ).collectLatest { result ->
+        coinListJob?.cancel()
+        coinListJob = viewModelScope.launch {
+            try {
+                val result = coinRepository.getCoins(
+                    currency = _uiState.value.currency.lowercase(),
+                    perPage = 100
+                ).first()
                 result.fold(
                     onSuccess = { coins -> _uiState.update { it.copy(allCoins = coins) } },
                     onFailure = { }
                 )
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
             }
         }
     }
@@ -69,40 +77,48 @@ class CoinComparisonViewModel @Inject constructor(
         val days = _uiState.value.selectedDays
         val currency = _uiState.value.currency.lowercase()
 
-        viewModelScope.launch {
+        comparisonJob?.cancel()
+        comparisonJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
-            launch {
-                coinRepository.getCoinDetail(coin1).collectLatest { result ->
-                    result.fold(
-                        onSuccess = { detail -> _uiState.update { it.copy(coin1Detail = detail) } },
-                        onFailure = { }
-                    )
+            try {
+                // Fetch all four in parallel
+                val detail1 = launch {
+                    try {
+                        coinRepository.getCoinDetail(coin1).first().fold(
+                            onSuccess = { detail -> _uiState.update { it.copy(coin1Detail = detail) } },
+                            onFailure = { }
+                        )
+                    } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
-            }
-            launch {
-                coinRepository.getCoinDetail(coin2).collectLatest { result ->
-                    result.fold(
-                        onSuccess = { detail -> _uiState.update { it.copy(coin2Detail = detail) } },
-                        onFailure = { }
-                    )
+                val detail2 = launch {
+                    try {
+                        coinRepository.getCoinDetail(coin2).first().fold(
+                            onSuccess = { detail -> _uiState.update { it.copy(coin2Detail = detail) } },
+                            onFailure = { }
+                        )
+                    } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
-            }
-            launch {
-                coinRepository.getMarketChart(coin1, currency, days).collectLatest { result ->
-                    result.fold(
-                        onSuccess = { chart -> _uiState.update { it.copy(coin1Chart = chart) } },
-                        onFailure = { }
-                    )
+                val chart1 = launch {
+                    try {
+                        coinRepository.getMarketChart(coin1, currency, days).first().fold(
+                            onSuccess = { chart -> _uiState.update { it.copy(coin1Chart = chart) } },
+                            onFailure = { }
+                        )
+                    } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
-            }
-            launch {
-                coinRepository.getMarketChart(coin2, currency, days).collectLatest { result ->
-                    result.fold(
-                        onSuccess = { chart -> _uiState.update { it.copy(coin2Chart = chart, isLoading = false) } },
-                        onFailure = { _uiState.update { it.copy(isLoading = false) } }
-                    )
+                val chart2 = launch {
+                    try {
+                        coinRepository.getMarketChart(coin2, currency, days).first().fold(
+                            onSuccess = { chart -> _uiState.update { it.copy(coin2Chart = chart) } },
+                            onFailure = { }
+                        )
+                    } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
+                detail1.join(); detail2.join(); chart1.join(); chart2.join()
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }

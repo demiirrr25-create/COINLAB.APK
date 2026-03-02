@@ -13,6 +13,15 @@ interface BinanceApi {
         @Query("symbol") symbol: String
     ): BinanceTicker
 
+    /**
+     * Fetch tickers for specific symbols only (~50 instead of 2000+).
+     * symbols format: ["BTCUSDT","ETHUSDT",...]
+     */
+    @GET("api/v3/ticker/24hr")
+    suspend fun getTickersBySymbols(
+        @Query("symbols") symbols: String
+    ): List<BinanceTicker>
+
     @GET("api/v3/klines")
     suspend fun getKlines(
         @Query("symbol") symbol: String,

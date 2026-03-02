@@ -6,12 +6,16 @@ import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.data.remote.BinanceCoinMapper
 import com.coinlab.app.data.remote.api.BinanceApi
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
 import kotlin.math.abs
 
@@ -204,89 +208,65 @@ class CommunityViewModel @Inject constructor(
 
                 val apiSignals = mutableListOf<TradeSignal>()
 
-                for ((coinId, symbol) in signalCoins) {
-                    try {
-                        val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: continue
-                        val klines = binanceApi.getKlines(
-                            symbol = binanceSymbol,
-                            interval = "1d",
-                            limit = 14
-                        )
+                // Parallel kline fetches for all signal coins (~200ms instead of 6×200ms)
+                supervisorScope {
+                    val deferredSignals = signalCoins.map { (coinId, symbol) ->
+                        async {
+                            try {
+                                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: return@async null
+                                val klines = binanceApi.getKlines(
+                                    symbol = binanceSymbol,
+                                    interval = "1d",
+                                    limit = 14
+                                )
 
-                        if (klines.size >= 14) {
-                            val closes = klines.map { (it.getOrNull(4) as? String)?.toDoubleOrNull() ?: 0.0 }
-                            val rsi = calculateRSI(closes)
-                            val currentPrice = closes.last()
-                            val prevPrice = closes[closes.size - 2]
+                                if (klines.size >= 14) {
+                                    val closes = klines.map { (it.getOrNull(4) as? String)?.toDoubleOrNull() ?: 0.0 }
+                                    val rsi = calculateRSI(closes)
+                                    val currentPrice = closes.last()
+                                    val prevPrice = closes[closes.size - 2]
 
-                            if (rsi != null) {
-                                val signal = when {
-                                    rsi < 30 -> {
-                                        TradeSignal(
-                                            id = "api_${coinId}",
-                                            author = "CoinLab AI",
-                                            coin = symbol,
-                                            direction = SignalDirection.LONG,
-                                            entryPrice = currentPrice,
-                                            targetPrice = currentPrice * 1.08,
-                                            stopLoss = currentPrice * 0.95,
-                                            confidence = if (rsi < 20) 5 else 4,
-                                            rsiValue = rsi,
-                                            signalSource = "RSI Oversold",
-                                            timestamp = System.currentTimeMillis()
-                                        )
+                                    if (rsi != null) {
+                                        val signal = when {
+                                            rsi < 30 -> TradeSignal(
+                                                id = "api_${coinId}", author = "CoinLab AI", coin = symbol,
+                                                direction = SignalDirection.LONG, entryPrice = currentPrice,
+                                                targetPrice = currentPrice * 1.08, stopLoss = currentPrice * 0.95,
+                                                confidence = if (rsi < 20) 5 else 4, rsiValue = rsi,
+                                                signalSource = "RSI Oversold", timestamp = System.currentTimeMillis()
+                                            )
+                                            rsi > 70 -> TradeSignal(
+                                                id = "api_${coinId}", author = "CoinLab AI", coin = symbol,
+                                                direction = SignalDirection.SHORT, entryPrice = currentPrice,
+                                                targetPrice = currentPrice * 0.92, stopLoss = currentPrice * 1.05,
+                                                confidence = if (rsi > 80) 5 else 4, rsiValue = rsi,
+                                                signalSource = "RSI Overbought", timestamp = System.currentTimeMillis()
+                                            )
+                                            rsi < 45 && currentPrice > prevPrice -> TradeSignal(
+                                                id = "api_${coinId}", author = "CoinLab AI", coin = symbol,
+                                                direction = SignalDirection.LONG, entryPrice = currentPrice,
+                                                targetPrice = currentPrice * 1.05, stopLoss = currentPrice * 0.97,
+                                                confidence = 3, rsiValue = rsi,
+                                                signalSource = "RSI Recovery", timestamp = System.currentTimeMillis()
+                                            )
+                                            rsi > 55 && currentPrice < prevPrice -> TradeSignal(
+                                                id = "api_${coinId}", author = "CoinLab AI", coin = symbol,
+                                                direction = SignalDirection.SHORT, entryPrice = currentPrice,
+                                                targetPrice = currentPrice * 0.95, stopLoss = currentPrice * 1.03,
+                                                confidence = 3, rsiValue = rsi,
+                                                signalSource = "RSI Divergence", timestamp = System.currentTimeMillis()
+                                            )
+                                            else -> null
+                                        }
+                                        return@async signal
                                     }
-                                    rsi > 70 -> {
-                                        TradeSignal(
-                                            id = "api_${coinId}",
-                                            author = "CoinLab AI",
-                                            coin = symbol,
-                                            direction = SignalDirection.SHORT,
-                                            entryPrice = currentPrice,
-                                            targetPrice = currentPrice * 0.92,
-                                            stopLoss = currentPrice * 1.05,
-                                            confidence = if (rsi > 80) 5 else 4,
-                                            rsiValue = rsi,
-                                            signalSource = "RSI Overbought",
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                    }
-                                    rsi < 45 && currentPrice > prevPrice -> {
-                                        TradeSignal(
-                                            id = "api_${coinId}",
-                                            author = "CoinLab AI",
-                                            coin = symbol,
-                                            direction = SignalDirection.LONG,
-                                            entryPrice = currentPrice,
-                                            targetPrice = currentPrice * 1.05,
-                                            stopLoss = currentPrice * 0.97,
-                                            confidence = 3,
-                                            rsiValue = rsi,
-                                            signalSource = "RSI Recovery",
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                    }
-                                    rsi > 55 && currentPrice < prevPrice -> {
-                                        TradeSignal(
-                                            id = "api_${coinId}",
-                                            author = "CoinLab AI",
-                                            coin = symbol,
-                                            direction = SignalDirection.SHORT,
-                                            entryPrice = currentPrice,
-                                            targetPrice = currentPrice * 0.95,
-                                            stopLoss = currentPrice * 1.03,
-                                            confidence = 3,
-                                            rsiValue = rsi,
-                                            signalSource = "RSI Divergence",
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                    }
-                                    else -> null
                                 }
-                                signal?.let { apiSignals.add(it) }
-                            }
+                                null
+                            } catch (_: Exception) { null }
                         }
-                    } catch (_: Exception) { }
+                    }
+                    val results = deferredSignals.awaitAll().filterNotNull()
+                    apiSignals.addAll(results)
                 }
 
                 _uiState.update { state ->
@@ -295,7 +275,8 @@ class CommunityViewModel @Inject constructor(
                         isSignalsLoading = false
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isSignalsLoading = false) }
             }
         }

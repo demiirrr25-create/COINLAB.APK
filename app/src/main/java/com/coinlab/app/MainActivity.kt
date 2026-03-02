@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,13 +23,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import com.coinlab.app.data.preferences.AuthPreferences
 import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.navigation.CoinLabNavHost
 import com.coinlab.app.ui.theme.CoinLabTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -42,6 +46,7 @@ class MainActivity : FragmentActivity() {
     private var isAuthenticated by mutableStateOf(false)
     private var biometricRequired by mutableStateOf(false)
     private var autoLogin by mutableStateOf(false)
+    private var prefsLoaded by mutableStateOf(false)
     private var deepLinkCoinId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,21 +54,27 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Check biometric preference (use IO dispatcher to avoid ANR)
-        val biometricEnabled = runBlocking(kotlinx.coroutines.Dispatchers.IO) { userPreferences.biometricEnabled.first() }
-        biometricRequired = biometricEnabled
+        // Keep splash screen until prefs are loaded
+        splashScreen.setKeepOnScreenCondition { !prefsLoaded }
 
-        // Check auto-login ("Beni Hatırla")
-        autoLogin = runBlocking(kotlinx.coroutines.Dispatchers.IO) { authPreferences.shouldAutoLogin() }
+        // Load preferences asynchronously to avoid ANR
+        lifecycleScope.launch(Dispatchers.IO) {
+            val biometricEnabled = userPreferences.biometricEnabled.first()
+            val shouldAutoLogin = authPreferences.shouldAutoLogin()
+            launch(Dispatchers.Main) {
+                biometricRequired = biometricEnabled
+                autoLogin = shouldAutoLogin
+                if (biometricEnabled) {
+                    checkBiometric()
+                } else {
+                    isAuthenticated = true
+                }
+                prefsLoaded = true
+            }
+        }
 
         // Handle deep link
         handleIntent(intent)
-
-        if (biometricEnabled) {
-            checkBiometric()
-        } else {
-            isAuthenticated = true
-        }
 
         setContent {
             val themeMode by userPreferences.themeMode.collectAsState(initial = "system")

@@ -3,7 +3,7 @@ package com.coinlab.app.ui.staking
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.remote.BinanceCoinMapper
-import com.coinlab.app.data.remote.api.BinanceApi
+import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +44,7 @@ enum class StakingSortBy {
 
 @HiltViewModel
 class StakingViewModel @Inject constructor(
-    private val binanceApi: BinanceApi
+    private val tickerCache: BinanceTickerCache
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StakingUiState())
@@ -134,9 +134,8 @@ class StakingViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
 
-                // Fetch all prices from Binance (free, no API key)
-                val tickers = binanceApi.get24hrTicker()
-                val tickerMap = tickers.associateBy { it.symbol }
+                // Fetch prices from centralized cache (fast, shared)
+                val tickerMap = tickerCache.getTickerMap()
 
                 val stakingCoins = stakingRates.map { (coinId, exchangeRates) ->
                     val meta = BinanceCoinMapper.getMetaByCoinId(coinId)

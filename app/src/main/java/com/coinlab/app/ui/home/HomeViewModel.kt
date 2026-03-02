@@ -3,7 +3,7 @@ package com.coinlab.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.remote.BinanceCoinMapper
-import com.coinlab.app.data.remote.api.BinanceApi
+import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.data.remote.websocket.SharedWebSocketManager
 import com.coinlab.app.domain.model.Coin
@@ -11,6 +11,7 @@ import com.coinlab.app.domain.repository.CoinRepository
 import com.coinlab.app.data.preferences.AuthPreferences
 import com.coinlab.app.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +43,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val coinRepository: CoinRepository,
-    private val binanceApi: BinanceApi,
+    private val tickerCache: BinanceTickerCache,
     private val fearGreedApi: FearGreedApi,
     private val userPreferences: UserPreferences,
     private val sharedWebSocketManager: SharedWebSocketManager,
@@ -64,17 +65,19 @@ class HomeViewModel @Inject constructor(
             try {
                 val name = authPreferences.displayName.first()
                 _uiState.update { it.copy(displayName = name) }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
+        // Load currency once and start data loading
         viewModelScope.launch {
             try {
-                userPreferences.currency.collect { currency ->
-                    _uiState.update { it.copy(currency = currency) }
-                    loadData()
-                }
-            } catch (_: Exception) {
-                loadData()
+                val currency = userPreferences.currency.first()
+                _uiState.update { it.copy(currency = currency) }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
             }
+            loadData()
         }
     }
 
@@ -91,6 +94,7 @@ class HomeViewModel @Inject constructor(
                 jobs.joinAll()
                 _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
@@ -101,61 +105,56 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isRefreshing = true) }
+                tickerCache.invalidate()
                 val jobs = listOf(
                     launch { loadCoins() },
                     launch { loadFearGreedIndex() },
                     launch { loadGlobalData() }
                 )
                 jobs.joinAll()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
     private suspend fun loadCoins() {
         try {
-            coinRepository.getCoins(
+            val result = coinRepository.getCoins(
                 currency = "usd",
                 orderBy = "market_cap_desc",
                 perPage = 10,
                 sparkline = false
-            ).collect { result ->
-                result.onSuccess { coins ->
-                    val top5 = coins.take(5)
-                    symbolIndexMap = top5.withIndex()
-                        .associate { (i, coin) -> coin.symbol.lowercase() to i }
-
-                    _uiState.update {
-                        it.copy(
-                            top5Coins = top5,
-                            error = null
-                        )
-                    }
-                    connectWebSocket()
-                }.onFailure { e ->
-                    _uiState.update {
-                        it.copy(error = e.message)
-                    }
+            ).first()
+            result.onSuccess { coins ->
+                val top5 = coins.take(5)
+                symbolIndexMap = top5.withIndex()
+                    .associate { (i, coin) -> coin.symbol.lowercase() to i }
+                _uiState.update {
+                    it.copy(top5Coins = top5, error = null)
                 }
+                connectWebSocket()
+            }.onFailure { e ->
+                _uiState.update { it.copy(error = e.message) }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             _uiState.update { it.copy(error = e.message) }
         }
     }
 
     private suspend fun loadGlobalData() {
         try {
-            // Calculate global data from Binance tickers (no API key needed)
-            val tickers = binanceApi.get24hrTicker()
-            val supported = BinanceCoinMapper.getAllBinanceSymbols()
-            val filteredTickers = tickers.filter { it.symbol in supported }
+            // Use centralized ticker cache (shared across all ViewModels, ~50 tickers only)
+            val tickers = tickerCache.getTickers()
 
             var totalMarketCap = 0.0
             var totalVolume = 0.0
             var btcMarketCap = 0.0
             var ethMarketCap = 0.0
 
-            for (ticker in filteredTickers) {
+            for (ticker in tickers) {
                 val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: continue) ?: continue
                 val price = ticker.lastPrice?.toDoubleOrNull() ?: continue
                 val volume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0
@@ -177,10 +176,12 @@ class HomeViewModel @Inject constructor(
                     btcDominance = btcDom,
                     ethDominance = ethDom,
                     marketCapChangePercent24h = 0.0,
-                    activeCryptos = filteredTickers.size
+                    activeCryptos = tickers.size
                 )
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+        }
     }
 
     private fun getApproxSupply(coinId: String): Double = when (coinId) {
@@ -242,7 +243,9 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+        }
     }
 
     override fun onCleared() {

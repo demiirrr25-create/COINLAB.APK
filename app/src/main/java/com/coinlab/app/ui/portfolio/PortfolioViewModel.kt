@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.data.remote.BinanceCoinMapper
-import com.coinlab.app.data.remote.api.BinanceApi
+import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.domain.model.PortfolioEntry
 import com.coinlab.app.domain.model.TransactionType
 import com.coinlab.app.domain.repository.PortfolioRepository
@@ -47,7 +47,7 @@ data class PortfolioHolding(
 @HiltViewModel
 class PortfolioViewModel @Inject constructor(
     private val portfolioRepository: PortfolioRepository,
-    private val binanceApi: BinanceApi,
+    private val tickerCache: BinanceTickerCache,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 
@@ -88,9 +88,8 @@ class PortfolioViewModel @Inject constructor(
                 return
             }
 
-            // Fetch all prices from Binance
-            val tickers = binanceApi.get24hrTicker()
-            val tickerMap = tickers.associateBy { it.symbol }
+            // Fetch prices from centralized cache (fast, shared)
+            val tickerMap = tickerCache.getTickerMap()
 
             val holdingsList = mutableListOf<PortfolioHolding>()
             var totalValue = 0.0

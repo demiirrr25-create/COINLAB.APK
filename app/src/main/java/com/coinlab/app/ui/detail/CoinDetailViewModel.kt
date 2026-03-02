@@ -9,6 +9,7 @@ import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.MarketChart
 import com.coinlab.app.domain.repository.CoinRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -178,7 +179,9 @@ class CoinDetailViewModel @Inject constructor(
                         }
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -188,7 +191,9 @@ class CoinDetailViewModel @Inject constructor(
                 coinRepository.isInWatchlist(coinId).collectLatest { isIn ->
                     _uiState.update { it.copy(isInWatchlist = isIn) }
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
@@ -200,7 +205,9 @@ class CoinDetailViewModel @Inject constructor(
                 } else {
                     coinRepository.addToWatchlist(coinId)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 

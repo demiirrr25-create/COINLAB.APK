@@ -7,6 +7,7 @@ import com.coinlab.app.data.local.entity.WatchlistEntity
 import com.coinlab.app.data.remote.BinanceCoinMapper
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.data.remote.dto.toDomain
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.model.CoinDetail
@@ -21,6 +22,7 @@ import javax.inject.Inject
 class CoinRepositoryImpl @Inject constructor(
     private val api: CoinGeckoApi,
     private val binanceApi: BinanceApi,
+    private val tickerCache: BinanceTickerCache,
     private val coinDao: CoinDao,
     private val watchlistDao: WatchlistDao
 ) : CoinRepository {
@@ -46,6 +48,7 @@ class CoinRepositoryImpl @Inject constructor(
                 val entities = coinDao.getAllCoins().first()
                 if (entities.isNotEmpty()) {
                     emit(Result.success(entities.map { it.toDomain() }))
+                    return@flow // Cache valid — don't fetch from network (avoid double-emit)
                 }
             }
 
@@ -95,11 +98,9 @@ class CoinRepositoryImpl @Inject constructor(
      */
     private suspend fun fetchCoinsFromBinance(limit: Int): List<Coin> {
         return try {
-            val tickers = binanceApi.get24hrTicker()
-            val supportedSymbols = BinanceCoinMapper.getAllBinanceSymbols()
+            val tickers = tickerCache.getTickers()
 
-            tickers.filter { it.symbol in supportedSymbols }
-                .mapNotNull { ticker ->
+            tickers.mapNotNull { ticker ->
                     val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: return@mapNotNull null)
                         ?: return@mapNotNull null
                     val price = ticker.lastPrice?.toDoubleOrNull() ?: return@mapNotNull null
@@ -334,12 +335,10 @@ class CoinRepositoryImpl @Inject constructor(
 
     override fun getTrendingCoins(): Flow<Result<List<Coin>>> = flow {
         try {
-            // Use Binance: top gainers as "trending"
-            val tickers = binanceApi.get24hrTicker()
-            val supportedSymbols = BinanceCoinMapper.getAllBinanceSymbols()
+            // Use cached tickers (shared, ~50 items)
+            val tickers = tickerCache.getTickers()
 
             val trending = tickers
-                .filter { it.symbol in supportedSymbols }
                 .sortedByDescending { it.priceChangePercent?.toDoubleOrNull() ?: 0.0 }
                 .take(10)
                 .mapNotNull { ticker ->
@@ -383,11 +382,11 @@ class CoinRepositoryImpl @Inject constructor(
                 emit(Result.success(emptyList()))
                 return@flow
             }
-            // Get from Binance
-            val tickers = binanceApi.get24hrTicker()
+            // Get from cached tickers
+            val tickerMap = tickerCache.getTickerMap()
             val coins = watchlistIds.mapNotNull { coinId ->
                 val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: return@mapNotNull null
-                val ticker = tickers.firstOrNull { it.symbol == binanceSymbol } ?: return@mapNotNull null
+                val ticker = tickerMap[binanceSymbol] ?: return@mapNotNull null
                 val meta = BinanceCoinMapper.getMetaByCoinId(coinId) ?: return@mapNotNull null
                 val price = ticker.lastPrice?.toDoubleOrNull() ?: return@mapNotNull null
 

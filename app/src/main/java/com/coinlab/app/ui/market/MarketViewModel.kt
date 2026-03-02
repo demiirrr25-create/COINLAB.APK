@@ -7,11 +7,11 @@ import com.coinlab.app.data.remote.websocket.SharedWebSocketManager
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.repository.CoinRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -47,6 +47,9 @@ class MarketViewModel @Inject constructor(
     val uiState: StateFlow<MarketUiState> = _uiState.asStateFlow()
 
     private var webSocketJob: Job? = null
+    private var loadCoinsJob: Job? = null
+    private var loadWatchlistJob: Job? = null
+    private var loadTrendingJob: Job? = null
 
     // Index map for O(1) WebSocket updates instead of O(n)
     private var symbolIndexMap: Map<String, Int> = emptyMap()
@@ -64,40 +67,41 @@ class MarketViewModel @Inject constructor(
     }
 
     fun loadCoins() {
-        viewModelScope.launch {
+        loadCoinsJob?.cancel()
+        loadCoinsJob = viewModelScope.launch {
             try {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            coinRepository.getCoins(
+            val result = coinRepository.getCoins(
                 currency = "usd",
                 orderBy = _uiState.value.sortOrder
-            ).collectLatest { result ->
-                result.fold(
-                    onSuccess = { coins ->
-                        // Build index map for O(1) WebSocket updates
-                        symbolIndexMap = coins.withIndex()
-                            .associate { (i, coin) -> coin.symbol.lowercase() to i }
-                        _uiState.update {
-                            it.copy(
-                                coins = coins,
-                                filteredCoins = filterCoins(coins, it.searchQuery, it.selectedTab),
-                                isLoading = false,
-                                isRefreshing = false,
-                                error = null
-                            )
-                        }
-                    },
-                    onFailure = { error ->
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                isRefreshing = false,
-                                error = error.localizedMessage ?: "Bir hata oluştu"
-                            )
-                        }
+            ).first()
+            result.fold(
+                onSuccess = { coins ->
+                    // Build index map for O(1) WebSocket updates
+                    symbolIndexMap = coins.withIndex()
+                        .associate { (i, coin) -> coin.symbol.lowercase() to i }
+                    _uiState.update {
+                        it.copy(
+                            coins = coins,
+                            filteredCoins = filterCoins(coins, it.searchQuery, it.selectedTab),
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = null
+                        )
                     }
-                )
-            }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = error.localizedMessage ?: "Bir hata oluştu"
+                        )
+                    }
+                }
+            )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
         }
@@ -144,33 +148,36 @@ class MarketViewModel @Inject constructor(
     }
 
     private fun loadWatchlist() {
-        viewModelScope.launch {
+        loadWatchlistJob?.cancel()
+        loadWatchlistJob = viewModelScope.launch {
             try {
-            coinRepository.getWatchlistCoins("usd")
-                .collectLatest { result ->
-                    result.fold(
-                        onSuccess = { coins ->
-                            _uiState.update { it.copy(watchlistCoins = coins) }
-                        },
-                        onFailure = { /* ignore */ }
-                    )
-                }
-            } catch (_: Exception) { }
+                val result = coinRepository.getWatchlistCoins("usd").first()
+                result.fold(
+                    onSuccess = { coins ->
+                        _uiState.update { it.copy(watchlistCoins = coins) }
+                    },
+                    onFailure = { /* ignore */ }
+                )
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
         }
     }
 
     private fun loadTrending() {
-        viewModelScope.launch {
+        loadTrendingJob?.cancel()
+        loadTrendingJob = viewModelScope.launch {
             try {
-            coinRepository.getTrendingCoins().collectLatest { result ->
+                val result = coinRepository.getTrendingCoins().first()
                 result.fold(
                     onSuccess = { coins ->
                         _uiState.update { it.copy(trendingCoins = coins) }
                     },
                     onFailure = { /* ignore */ }
                 )
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
             }
-            } catch (_: Exception) { }
         }
     }
 

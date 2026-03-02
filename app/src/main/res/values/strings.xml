@@ -248,7 +248,7 @@
     <string name="active_alerts">Uyarılar</string>
     <string name="quick_settings">Hızlı Ayarlar</string>
     <string name="settings_desc">Tema, dil, bildirimler</string>
-    <string name="app_version_display">Sürüm 6.8.0</string>
+    <string name="app_version_display">Sürüm 7.5.1</string>
 
     <!-- v6.0 - Staking -->
     <string name="staking">Staking</string>
@@ -286,5 +286,5 @@
     <string name="greeting_evening">İyi akşamlar</string>
     <string name="greeting_night">İyi geceler</string>
     <string name="shared_via_coinlab">CoinLab ile paylaşıldı 🧪</string>
-    <string name="app_version">v7.5.0</string>
+    <string name="app_version">v7.5.1</string>
 </resources>

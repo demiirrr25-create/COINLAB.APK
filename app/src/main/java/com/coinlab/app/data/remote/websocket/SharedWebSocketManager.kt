@@ -40,6 +40,7 @@ class SharedWebSocketManager @Inject constructor(
     private var disconnectJob: Job? = null
     private val activeSymbols = mutableSetOf<String>()
     private val symbolLock = Any()
+    private var reconnectAttempt = 0
 
     /**
      * Subscribe to real-time ticker updates for given symbols.
@@ -87,13 +88,17 @@ class SharedWebSocketManager @Inject constructor(
             Log.d(TAG, "Connecting WebSocket for ${symbols.size} symbols")
             try {
                 webSocketClient.connectToTicker(symbols).collect { ticker ->
+                    reconnectAttempt = 0 // Reset on successful data
                     _tickerFlow.emit(ticker)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "WebSocket collection ended: ${e.message}")
-                // Auto-reconnect after brief delay if still have subscribers
+                // Auto-reconnect with exponential backoff if still have subscribers
                 if (subscriberCount.get() > 0) {
-                    delay(3000)
+                    val delayMs = minOf(3000L * (1 shl reconnectAttempt), 60_000L)
+                    reconnectAttempt++
+                    Log.d(TAG, "Reconnecting in ${delayMs}ms (attempt=$reconnectAttempt)")
+                    delay(delayMs)
                     reconnect()
                 }
             }

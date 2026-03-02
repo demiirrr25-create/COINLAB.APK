@@ -6,7 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.remote.BinanceCoinMapper
-import com.coinlab.app.data.remote.api.BinanceApi
+import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.notification.NotificationHelper
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -16,7 +16,7 @@ class PriceAlertWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val priceAlertDao: PriceAlertDao,
-    private val binanceApi: BinanceApi,
+    private val tickerCache: BinanceTickerCache,
     private val notificationHelper: NotificationHelper
 ) : CoroutineWorker(context, workerParams) {
 
@@ -25,9 +25,8 @@ class PriceAlertWorker @AssistedInject constructor(
             val activeAlerts = priceAlertDao.getActiveAlerts()
             if (activeAlerts.isEmpty()) return Result.success()
 
-            // Fetch all prices from Binance (free, no API key)
-            val tickers = binanceApi.get24hrTicker()
-            val tickerMap = tickers.associateBy { it.symbol }
+            // Fetch prices from centralized cache
+            val tickerMap = tickerCache.getTickerMap(forceRefresh = true)
 
             // Check each alert
             for (alert in activeAlerts) {
