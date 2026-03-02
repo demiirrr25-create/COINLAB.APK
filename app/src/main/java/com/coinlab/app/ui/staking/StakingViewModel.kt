@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.remote.BinanceCoinMapper
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -172,6 +173,7 @@ class StakingViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update {
                     it.copy(isLoading = false, error = e.message)
                 }

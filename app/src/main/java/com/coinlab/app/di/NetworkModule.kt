@@ -59,9 +59,9 @@ object NetworkModule {
                 chain.proceed(requestBuilder.build())
             }
             .connectionPool(connectionPool)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }
@@ -79,9 +79,9 @@ object NetworkModule {
                 chain.proceed(request)
             }
             .connectionPool(connectionPool)
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
             .build()
     }
 

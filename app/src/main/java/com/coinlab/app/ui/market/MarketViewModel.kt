@@ -61,6 +61,7 @@ class MarketViewModel @Inject constructor(
                 _uiState.update { it.copy(currency = currency) }
                 loadCoins()
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }
         }
@@ -114,7 +115,9 @@ class MarketViewModel @Inject constructor(
                 loadCoins()
                 if (_uiState.value.selectedTab == MarketTab.WATCHLIST) loadWatchlist()
                 if (_uiState.value.selectedTab == MarketTab.TRENDING) loadTrending()
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

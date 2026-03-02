@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -87,15 +86,15 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
-                supervisorScope {
-                    val jobs = listOf(
-                        launch { loadCoins() },
-                        launch { loadFearGreedIndex() },
-                        launch { loadGlobalData() }
-                    )
-                    jobs.joinAll()
-                }
+                // Load coins FIRST — this is what the user sees
+                // Don't wait for FearGreed/GlobalData to finish before showing coins
+                loadCoins()
                 _uiState.update { it.copy(isLoading = false) }
+                // Load secondary data in background — non-blocking
+                supervisorScope {
+                    launch { loadFearGreedIndex() }
+                    launch { loadGlobalData() }
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
@@ -109,18 +108,17 @@ class HomeViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isRefreshing = true) }
                 tickerCache.invalidate()
+                // Load coins first, then secondary data
+                loadCoins()
+                _uiState.update { it.copy(isRefreshing = false) }
                 supervisorScope {
-                    val jobs = listOf(
-                        launch { loadCoins() },
-                        launch { loadFearGreedIndex() },
-                        launch { loadGlobalData() }
-                    )
-                    jobs.joinAll()
+                    launch { loadFearGreedIndex() }
+                    launch { loadGlobalData() }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                _uiState.update { it.copy(isRefreshing = false) }
             }
-            _uiState.update { it.copy(isRefreshing = false) }
         }
     }
 
@@ -129,7 +127,7 @@ class HomeViewModel @Inject constructor(
             val result = coinRepository.getCoins(
                 currency = "usd",
                 orderBy = "market_cap_desc",
-                perPage = 10,
+                perPage = 50,
                 sparkline = false
             ).first()
             result.onSuccess { coins ->

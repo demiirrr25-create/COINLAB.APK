@@ -15,6 +15,7 @@ import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.CoinLinks
 import com.coinlab.app.domain.model.MarketChart
 import com.coinlab.app.domain.repository.CoinRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -85,6 +86,7 @@ class CoinRepositoryImpl @Inject constructor(
             }
             emit(Result.success(geckoCoins))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Fallback to cache on error
             try {
                 val entities = coinDao.getAllCoins().first()
@@ -95,6 +97,8 @@ class CoinRepositoryImpl @Inject constructor(
                     android.util.Log.w("CoinRepo", "All sources failed, using static fallback: ${e.message}")
                     emit(Result.success(StaticFallbackData.getDefaultCoins()))
                 }
+            } catch (ce: CancellationException) {
+                throw ce
             } catch (_: Exception) {
                 // Even Room failed — serve static data
                 android.util.Log.w("CoinRepo", "Room + all APIs failed, static fallback: ${e.message}")
@@ -148,6 +152,7 @@ class CoinRepositoryImpl @Inject constructor(
                 .sortedBy { it.marketCapRank }
                 .take(limit)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             android.util.Log.w("CoinRepo", "Binance fetch failed: ${e.message}")
             null // Signal failure so CoinGecko fallback is tried
         }
@@ -205,6 +210,7 @@ class CoinRepositoryImpl @Inject constructor(
             // If nothing in cache, return empty
             emit(Result.success(emptyList()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             emit(Result.success(emptyList()))
         }
     }
@@ -264,13 +270,14 @@ class CoinRepositoryImpl @Inject constructor(
                         emit(Result.success(detail))
                         return@flow
                     }
-                } catch (_: Exception) { /* fall through to CoinGecko */ }
+                } catch (ce: CancellationException) { throw ce } catch (_: Exception) { /* fall through to CoinGecko */ }
             }
 
             // Fallback to CoinGecko for detailed data
             val response = api.getCoinDetail(coinId)
             emit(Result.success(response.toDomain()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -294,6 +301,7 @@ class CoinRepositoryImpl @Inject constructor(
             )
             emit(Result.success(response.toDomain()))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -345,6 +353,7 @@ class CoinRepositoryImpl @Inject constructor(
                 )))
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -401,7 +410,8 @@ class CoinRepositoryImpl @Inject constructor(
                 }
             emit(Result.success(trending))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (e is CancellationException) throw e
+            emit(Result.success(emptyList()))
         }
     }
 
@@ -455,7 +465,8 @@ class CoinRepositoryImpl @Inject constructor(
             }
             emit(Result.success(coins))
         } catch (e: Exception) {
-            emit(Result.failure(e))
+            if (e is CancellationException) throw e
+            emit(Result.success(emptyList()))
         }
     }
 
