@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Colors -->
+    <color name="coinlab_primary">#FF6200EE</color>
+    <color name="coinlab_primary_dark">#FF3700B3</color>
+    <color name="coinlab_secondary">#FF03DAC5</color>
+    <color name="coinlab_accent">#FFBB86FC</color>
+
+    <!-- Splash -->
+    <color name="splash_background">#FF121212</color>
+
+    <!-- Widget -->
+    <color name="widget_background">#FF1E1E2E</color>
+    <color name="widget_text">#FFFFFFFF</color>
+
+    <!-- Price Colors -->
+    <color name="price_up">#FF4CAF50</color>
+    <color name="price_down">#FFF44336</color>
+    <color name="price_neutral">#FF9E9E9E</color>
+</resources>
