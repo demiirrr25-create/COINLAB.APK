@@ -4,7 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.FearGreedIndex
@@ -58,7 +59,7 @@ enum class SignalType { BUY, SELL, NEUTRAL }
 class TechnicalAnalysisViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val coinRepository: CoinRepository,
-    private val coinGeckoApi: CoinGeckoApi,
+    private val binanceApi: BinanceApi,
     private val fearGreedApi: FearGreedApi,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
@@ -99,18 +100,31 @@ class TechnicalAnalysisViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, selectedTimeRange = days) }
             try {
-                val ohlcRaw = coinGeckoApi.getOhlc(
-                    coinId = coinId,
-                    currency = _uiState.value.currency.lowercase(),
-                    days = days
+                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: "BTCUSDT"
+                // Map days to Binance kline interval + limit
+                val pair: Pair<String, Int> = when (days) {
+                    "1" -> "1h" to 24
+                    "7" -> "4h" to 42
+                    "14" -> "4h" to 84
+                    "30" -> "1d" to 30
+                    "90" -> "1d" to 90
+                    "365" -> "1d" to 365
+                    else -> "1d" to (days.toIntOrNull()?.coerceIn(1, 1000) ?: 30)
+                }
+                val interval = pair.first
+                val limit = pair.second
+                val klines = binanceApi.getKlines(
+                    symbol = binanceSymbol,
+                    interval = interval,
+                    limit = limit
                 )
-                val ohlcData = ohlcRaw.map { point ->
+                val ohlcData = klines.map { point ->
                     OhlcData(
-                        timestamp = point[0].toLong(),
-                        open = point[1],
-                        high = point[2],
-                        low = point[3],
-                        close = point[4]
+                        timestamp = (point[0] as? Number)?.toLong() ?: 0L,
+                        open = (point[1] as? String)?.toDoubleOrNull() ?: 0.0,
+                        high = (point[2] as? String)?.toDoubleOrNull() ?: 0.0,
+                        low = (point[3] as? String)?.toDoubleOrNull() ?: 0.0,
+                        close = (point[4] as? String)?.toDoubleOrNull() ?: 0.0
                     )
                 }
                 _uiState.update { it.copy(ohlcData = ohlcData, isLoading = false) }

@@ -3,7 +3,6 @@ package com.coinlab.app.ui.comparison
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.MarketChart
@@ -35,7 +34,6 @@ data class ComparisonUiState(
 @HiltViewModel
 class CoinComparisonViewModel @Inject constructor(
     private val coinRepository: CoinRepository,
-    private val coinGeckoApi: CoinGeckoApi,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 

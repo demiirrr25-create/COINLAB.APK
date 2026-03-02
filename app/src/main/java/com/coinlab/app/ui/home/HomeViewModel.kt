@@ -2,7 +2,8 @@ package com.coinlab.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.data.remote.websocket.SharedWebSocketManager
 import com.coinlab.app.domain.model.Coin
@@ -41,7 +42,7 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val coinRepository: CoinRepository,
-    private val coinGeckoApi: CoinGeckoApi,
+    private val binanceApi: BinanceApi,
     private val fearGreedApi: FearGreedApi,
     private val userPreferences: UserPreferences,
     private val sharedWebSocketManager: SharedWebSocketManager,
@@ -144,19 +145,54 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun loadGlobalData() {
         try {
-            val global = coinGeckoApi.getGlobalData()
-            val data = global.data ?: return
+            // Calculate global data from Binance tickers (no API key needed)
+            val tickers = binanceApi.get24hrTicker()
+            val supported = BinanceCoinMapper.getAllBinanceSymbols()
+            val filteredTickers = tickers.filter { it.symbol in supported }
+
+            var totalMarketCap = 0.0
+            var totalVolume = 0.0
+            var btcMarketCap = 0.0
+            var ethMarketCap = 0.0
+
+            for (ticker in filteredTickers) {
+                val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: continue) ?: continue
+                val price = ticker.lastPrice?.toDoubleOrNull() ?: continue
+                val volume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0
+                val supply = getApproxSupply(meta.id)
+                val mcap = price * supply
+                totalMarketCap += mcap
+                totalVolume += volume
+                if (meta.id == "bitcoin") btcMarketCap = mcap
+                if (meta.id == "ethereum") ethMarketCap = mcap
+            }
+
+            val btcDom = if (totalMarketCap > 0) (btcMarketCap / totalMarketCap) * 100 else 0.0
+            val ethDom = if (totalMarketCap > 0) (ethMarketCap / totalMarketCap) * 100 else 0.0
+
             _uiState.update {
                 it.copy(
-                    totalMarketCap = data.total_market_cap?.get("usd") ?: 0.0,
-                    totalVolume24h = data.total_volume?.get("usd") ?: 0.0,
-                    btcDominance = data.market_cap_percentage?.get("btc") ?: 0.0,
-                    ethDominance = data.market_cap_percentage?.get("eth") ?: 0.0,
-                    marketCapChangePercent24h = data.market_cap_change_percentage_24h_usd ?: 0.0,
-                    activeCryptos = data.active_cryptocurrencies ?: 0
+                    totalMarketCap = totalMarketCap,
+                    totalVolume24h = totalVolume,
+                    btcDominance = btcDom,
+                    ethDominance = ethDom,
+                    marketCapChangePercent24h = 0.0,
+                    activeCryptos = filteredTickers.size
                 )
             }
         } catch (_: Exception) { }
+    }
+
+    private fun getApproxSupply(coinId: String): Double = when (coinId) {
+        "bitcoin" -> 19_800_000.0
+        "ethereum" -> 120_500_000.0
+        "binancecoin" -> 145_000_000.0
+        "solana" -> 470_000_000.0
+        "ripple" -> 57_000_000_000.0
+        "cardano" -> 36_000_000_000.0
+        "dogecoin" -> 147_000_000_000.0
+        "tron" -> 86_000_000_000.0
+        else -> 1_000_000_000.0
     }
 
     private fun connectWebSocket() {

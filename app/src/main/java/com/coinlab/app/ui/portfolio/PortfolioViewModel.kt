@@ -3,7 +3,8 @@ package com.coinlab.app.ui.portfolio
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.domain.model.PortfolioEntry
 import com.coinlab.app.domain.model.TransactionType
 import com.coinlab.app.domain.repository.PortfolioRepository
@@ -46,7 +47,7 @@ data class PortfolioHolding(
 @HiltViewModel
 class PortfolioViewModel @Inject constructor(
     private val portfolioRepository: PortfolioRepository,
-    private val api: CoinGeckoApi,
+    private val binanceApi: BinanceApi,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 
@@ -87,10 +88,9 @@ class PortfolioViewModel @Inject constructor(
                 return
             }
 
-            val prices = api.getSimplePrice(
-                ids = coinIds.joinToString(","),
-                currencies = _uiState.value.currency.lowercase()
-            )
+            // Fetch all prices from Binance
+            val tickers = binanceApi.get24hrTicker()
+            val tickerMap = tickers.associateBy { it.symbol }
 
             val holdingsList = mutableListOf<PortfolioHolding>()
             var totalValue = 0.0
@@ -110,7 +110,8 @@ class PortfolioViewModel @Inject constructor(
                     buyEntries.sumOf { it.amount * it.buyPrice } / totalBought
                 } else 0.0
 
-                val currentPrice = prices[coinId]?.get(_uiState.value.currency.lowercase()) ?: 0.0
+                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId)
+                val currentPrice = binanceSymbol?.let { tickerMap[it]?.lastPrice?.toDoubleOrNull() } ?: 0.0
                 val holdingValue = netAmount * currentPrice
                 val holdingCost = netAmount * avgBuyPrice
                 val pnl = holdingValue - holdingCost

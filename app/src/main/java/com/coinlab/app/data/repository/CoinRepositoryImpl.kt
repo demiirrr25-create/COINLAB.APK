@@ -4,11 +4,13 @@ import com.coinlab.app.data.local.dao.CoinDao
 import com.coinlab.app.data.local.dao.WatchlistDao
 import com.coinlab.app.data.local.entity.CoinEntity
 import com.coinlab.app.data.local.entity.WatchlistEntity
+import com.coinlab.app.data.remote.BinanceCoinMapper
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.data.remote.dto.toDomain
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.model.CoinDetail
+import com.coinlab.app.domain.model.CoinLinks
 import com.coinlab.app.domain.model.MarketChart
 import com.coinlab.app.domain.repository.CoinRepository
 import kotlinx.coroutines.flow.Flow
@@ -44,11 +46,22 @@ class CoinRepositoryImpl @Inject constructor(
                 val entities = coinDao.getAllCoins().first()
                 if (entities.isNotEmpty()) {
                     emit(Result.success(entities.map { it.toDomain() }))
-                    // Don't return — continue to refresh in background
                 }
             }
 
-            // Fetch from API (always, to keep data fresh)
+            // PRIMARY: Fetch from Binance (no API key, fast, reliable)
+            val coins = fetchCoinsFromBinance(perPage)
+            if (coins.isNotEmpty()) {
+                // Cache results
+                if (page == 1) {
+                    coinDao.deleteAll()
+                    coinDao.insertAll(coins.map { it.toEntity() })
+                }
+                emit(Result.success(coins))
+                return@flow
+            }
+
+            // FALLBACK: CoinGecko
             val response = api.getCoins(
                 currency = currency,
                 orderBy = orderBy,
@@ -56,15 +69,12 @@ class CoinRepositoryImpl @Inject constructor(
                 page = page,
                 sparkline = sparkline
             )
-            val coins = response.map { it.toDomain() }
-
-            // Cache results
+            val geckoCoins = response.map { it.toDomain() }
             if (page == 1) {
                 coinDao.deleteAll()
+                coinDao.insertAll(response.map { it.toEntity() })
             }
-            coinDao.insertAll(response.map { it.toEntity() })
-
-            emit(Result.success(coins))
+            emit(Result.success(geckoCoins))
         } catch (e: Exception) {
             // Fallback to cache on error
             try {
@@ -80,36 +90,167 @@ class CoinRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Fetch coin data from Binance 24hr ticker — no API key needed, very fast
+     */
+    private suspend fun fetchCoinsFromBinance(limit: Int): List<Coin> {
+        return try {
+            val tickers = binanceApi.get24hrTicker()
+            val supportedSymbols = BinanceCoinMapper.getAllBinanceSymbols()
+
+            tickers.filter { it.symbol in supportedSymbols }
+                .mapNotNull { ticker ->
+                    val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: return@mapNotNull null)
+                        ?: return@mapNotNull null
+                    val price = ticker.lastPrice?.toDoubleOrNull() ?: return@mapNotNull null
+                    val volume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0
+                    val change24h = ticker.priceChangePercent?.toDoubleOrNull() ?: 0.0
+
+                    Coin(
+                        id = meta.id,
+                        symbol = meta.symbol,
+                        name = meta.name,
+                        image = meta.image,
+                        currentPrice = price,
+                        marketCap = (price * getApproxCirculatingSupply(meta.id)).toLong(),
+                        marketCapRank = BinanceCoinMapper.getMarketCapRank(meta.id),
+                        totalVolume = volume,
+                        priceChangePercentage24h = change24h,
+                        priceChangePercentage7d = null,
+                        circulatingSupply = getApproxCirculatingSupply(meta.id),
+                        totalSupply = null,
+                        maxSupply = null,
+                        ath = 0.0,
+                        athChangePercentage = 0.0,
+                        athDate = "",
+                        atl = 0.0,
+                        atlChangePercentage = 0.0,
+                        atlDate = "",
+                        sparklineIn7d = null,
+                        lastUpdated = System.currentTimeMillis().toString()
+                    )
+                }
+                .sortedBy { it.marketCapRank }
+                .take(limit)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Approximate circulating supply for market cap calculation
+     */
+    private fun getApproxCirculatingSupply(coinId: String): Double = when (coinId) {
+        "bitcoin" -> 19_800_000.0
+        "ethereum" -> 120_500_000.0
+        "binancecoin" -> 145_000_000.0
+        "solana" -> 470_000_000.0
+        "ripple" -> 57_000_000_000.0
+        "cardano" -> 36_000_000_000.0
+        "dogecoin" -> 147_000_000_000.0
+        "tron" -> 86_000_000_000.0
+        "polkadot" -> 1_500_000_000.0
+        "avalanche-2" -> 410_000_000.0
+        "chainlink" -> 630_000_000.0
+        "shiba-inu" -> 589_000_000_000_000.0
+        "matic-network" -> 10_000_000_000.0
+        "litecoin" -> 75_000_000.0
+        "uniswap" -> 600_000_000.0
+        "cosmos" -> 390_000_000.0
+        "near" -> 1_200_000_000.0
+        "aptos" -> 500_000_000.0
+        "sui" -> 3_000_000_000.0
+        "internet-computer" -> 520_000_000.0
+        "ethereum-classic" -> 148_000_000.0
+        "filecoin" -> 580_000_000.0
+        "stellar" -> 30_000_000_000.0
+        "vechain" -> 73_000_000_000.0
+        "hedera-hashgraph" -> 40_000_000_000.0
+        "aave" -> 15_000_000.0
+        "algorand" -> 8_200_000_000.0
+        "injective-protocol" -> 97_000_000.0
+        "celestia" -> 250_000_000.0
+        "arbitrum" -> 3_400_000_000.0
+        "optimism" -> 1_400_000_000.0
+        "maker" -> 900_000.0
+        "pepe" -> 420_690_000_000_000.0
+        else -> 1_000_000_000.0
+    }
+
     override fun searchCoins(query: String): Flow<Result<List<Coin>>> = flow {
         try {
-            val response = api.searchCoins(query)
-            val coinIds = response.coins?.take(20)?.map { it.id } ?: emptyList()
-
-            if (coinIds.isNotEmpty()) {
-                val marketData = api.getCoins(
-                    currency = "usd",
-                    perPage = 20,
-                    page = 1,
-                    sparkline = false
-                ).filter { it.id in coinIds }
-
-                emit(Result.success(marketData.map { it.toDomain() }))
-            } else {
-                emit(Result.success(emptyList()))
-            }
-        } catch (e: Exception) {
-            // Fallback to local search
-            try {
-                val entities = coinDao.searchCoins(query).first()
+            // Search in local cache first (very fast)
+            val entities = coinDao.searchCoins(query).first()
+            if (entities.isNotEmpty()) {
                 emit(Result.success(entities.map { it.toDomain() }))
-            } catch (_: Exception) {
-                emit(Result.success(emptyList()))
+                return@flow
             }
+            // If nothing in cache, return empty
+            emit(Result.success(emptyList()))
+        } catch (e: Exception) {
+            emit(Result.success(emptyList()))
         }
     }
 
     override fun getCoinDetail(coinId: String): Flow<Result<CoinDetail>> = flow {
         try {
+            // Try Binance ticker for basic data first
+            val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId)
+            if (binanceSymbol != null) {
+                try {
+                    val ticker = binanceApi.getTickerBySymbol(binanceSymbol)
+                    val meta = BinanceCoinMapper.getMetaByCoinId(coinId)
+                    if (meta != null && ticker.lastPrice != null) {
+                        val price = ticker.lastPrice.toDoubleOrNull() ?: 0.0
+                        val change = ticker.priceChangePercent?.toDoubleOrNull() ?: 0.0
+                        val high = ticker.highPrice?.toDoubleOrNull() ?: 0.0
+                        val low = ticker.lowPrice?.toDoubleOrNull() ?: 0.0
+                        val volume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0
+
+                        val detail = CoinDetail(
+                            id = meta.id,
+                            symbol = meta.symbol,
+                            name = meta.name,
+                            image = meta.image,
+                            description = "",
+                            currentPrice = mapOf("usd" to price),
+                            marketCap = mapOf("usd" to (price * getApproxCirculatingSupply(meta.id)).toLong()),
+                            marketCapRank = BinanceCoinMapper.getMarketCapRank(meta.id),
+                            totalVolume = mapOf("usd" to volume),
+                            high24h = mapOf("usd" to high),
+                            low24h = mapOf("usd" to low),
+                            priceChange24h = price * change / 100.0,
+                            priceChangePercentage24h = change,
+                            priceChangePercentage7d = 0.0,
+                            priceChangePercentage30d = 0.0,
+                            priceChangePercentage1y = 0.0,
+                            circulatingSupply = getApproxCirculatingSupply(meta.id),
+                            totalSupply = null,
+                            maxSupply = null,
+                            ath = emptyMap(),
+                            athChangePercentage = emptyMap(),
+                            atl = emptyMap(),
+                            atlChangePercentage = emptyMap(),
+                            genesisDate = null,
+                            homepageUrl = null,
+                            blockchainSite = null,
+                            categories = emptyList(),
+                            links = CoinLinks(
+                                homepage = emptyList(),
+                                blockchain = emptyList(),
+                                reddit = null,
+                                twitter = null,
+                                telegram = null,
+                                github = emptyList()
+                            )
+                        )
+                        emit(Result.success(detail))
+                        return@flow
+                    }
+                } catch (_: Exception) { /* fall through to CoinGecko */ }
+            }
+
+            // Fallback to CoinGecko for detailed data
             val response = api.getCoinDetail(coinId)
             emit(Result.success(response.toDomain()))
         } catch (e: Exception) {
@@ -193,18 +334,43 @@ class CoinRepositoryImpl @Inject constructor(
 
     override fun getTrendingCoins(): Flow<Result<List<Coin>>> = flow {
         try {
-            val trending = api.getTrending()
-            val ids = trending.coins?.map { it.item.id } ?: emptyList()
-            if (ids.isNotEmpty()) {
-                val coins = api.getCoins(
-                    currency = "usd",
-                    perPage = ids.size,
-                    sparkline = true
-                ).filter { it.id in ids }
-                emit(Result.success(coins.map { it.toDomain() }))
-            } else {
-                emit(Result.success(emptyList()))
-            }
+            // Use Binance: top gainers as "trending"
+            val tickers = binanceApi.get24hrTicker()
+            val supportedSymbols = BinanceCoinMapper.getAllBinanceSymbols()
+
+            val trending = tickers
+                .filter { it.symbol in supportedSymbols }
+                .sortedByDescending { it.priceChangePercent?.toDoubleOrNull() ?: 0.0 }
+                .take(10)
+                .mapNotNull { ticker ->
+                    val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: return@mapNotNull null)
+                        ?: return@mapNotNull null
+                    val price = ticker.lastPrice?.toDoubleOrNull() ?: return@mapNotNull null
+                    Coin(
+                        id = meta.id,
+                        symbol = meta.symbol,
+                        name = meta.name,
+                        image = meta.image,
+                        currentPrice = price,
+                        marketCap = (price * getApproxCirculatingSupply(meta.id)).toLong(),
+                        marketCapRank = BinanceCoinMapper.getMarketCapRank(meta.id),
+                        totalVolume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0,
+                        priceChangePercentage24h = ticker.priceChangePercent?.toDoubleOrNull() ?: 0.0,
+                        priceChangePercentage7d = null,
+                        circulatingSupply = getApproxCirculatingSupply(meta.id),
+                        totalSupply = null,
+                        maxSupply = null,
+                        ath = 0.0,
+                        athChangePercentage = 0.0,
+                        athDate = "",
+                        atl = 0.0,
+                        atlChangePercentage = 0.0,
+                        atlDate = "",
+                        sparklineIn7d = null,
+                        lastUpdated = System.currentTimeMillis().toString()
+                    )
+                }
+            emit(Result.success(trending))
         } catch (e: Exception) {
             emit(Result.failure(e))
         }
@@ -213,19 +379,43 @@ class CoinRepositoryImpl @Inject constructor(
     override fun getWatchlistCoins(currency: String): Flow<Result<List<Coin>>> = flow {
         try {
             val watchlistIds = watchlistDao.getAllCoinIds()
-            if (watchlistIds.isNotEmpty()) {
-                val idsParam = watchlistIds.joinToString(",")
-                // Use ids parameter for efficient targeted fetch instead of fetching all 250
-                val watchlistCoins = api.getCoins(
-                    currency = currency,
-                    ids = idsParam,
-                    perPage = watchlistIds.size,
-                    sparkline = true
-                )
-                emit(Result.success(watchlistCoins.map { it.toDomain() }))
-            } else {
+            if (watchlistIds.isEmpty()) {
                 emit(Result.success(emptyList()))
+                return@flow
             }
+            // Get from Binance
+            val tickers = binanceApi.get24hrTicker()
+            val coins = watchlistIds.mapNotNull { coinId ->
+                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: return@mapNotNull null
+                val ticker = tickers.firstOrNull { it.symbol == binanceSymbol } ?: return@mapNotNull null
+                val meta = BinanceCoinMapper.getMetaByCoinId(coinId) ?: return@mapNotNull null
+                val price = ticker.lastPrice?.toDoubleOrNull() ?: return@mapNotNull null
+
+                Coin(
+                    id = meta.id,
+                    symbol = meta.symbol,
+                    name = meta.name,
+                    image = meta.image,
+                    currentPrice = price,
+                    marketCap = (price * getApproxCirculatingSupply(meta.id)).toLong(),
+                    marketCapRank = BinanceCoinMapper.getMarketCapRank(meta.id),
+                    totalVolume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0,
+                    priceChangePercentage24h = ticker.priceChangePercent?.toDoubleOrNull() ?: 0.0,
+                    priceChangePercentage7d = null,
+                    circulatingSupply = getApproxCirculatingSupply(meta.id),
+                    totalSupply = null,
+                    maxSupply = null,
+                    ath = 0.0,
+                    athChangePercentage = 0.0,
+                    athDate = "",
+                    atl = 0.0,
+                    atlChangePercentage = 0.0,
+                    atlDate = "",
+                    sparklineIn7d = null,
+                    lastUpdated = System.currentTimeMillis().toString()
+                )
+            }
+            emit(Result.success(coins))
         } catch (e: Exception) {
             emit(Result.failure(e))
         }
@@ -244,7 +434,34 @@ class CoinRepositoryImpl @Inject constructor(
     }
 }
 
-// Extension functions for mapping
+// Extension: Coin domain model → CoinEntity for Room caching
+private fun Coin.toEntity(): CoinEntity {
+    return CoinEntity(
+        id = id,
+        symbol = symbol.uppercase(),
+        name = name,
+        image = image,
+        currentPrice = currentPrice,
+        marketCap = marketCap,
+        marketCapRank = marketCapRank,
+        totalVolume = totalVolume,
+        priceChangePercentage24h = priceChangePercentage24h,
+        priceChangePercentage7d = priceChangePercentage7d,
+        circulatingSupply = circulatingSupply,
+        totalSupply = totalSupply,
+        maxSupply = maxSupply,
+        ath = ath,
+        athChangePercentage = athChangePercentage,
+        athDate = athDate,
+        atl = atl,
+        atlChangePercentage = atlChangePercentage,
+        atlDate = atlDate,
+        lastUpdated = lastUpdated,
+        sparklineData = sparklineIn7d?.joinToString(",")
+    )
+}
+
+// Extension: CoinEntity → Coin domain model
 private fun CoinEntity.toDomain(): Coin {
     val sparkline = sparklineData?.let { data ->
         try {
@@ -276,6 +493,7 @@ private fun CoinEntity.toDomain(): Coin {
     )
 }
 
+// Extension: CoinDto → CoinEntity (for CoinGecko fallback)
 private fun com.coinlab.app.data.remote.dto.CoinDto.toEntity(): CoinEntity {
     return CoinEntity(
         id = id,

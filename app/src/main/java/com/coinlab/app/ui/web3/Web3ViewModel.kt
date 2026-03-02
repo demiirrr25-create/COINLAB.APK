@@ -3,7 +3,6 @@ package com.coinlab.app.ui.web3
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.api.CoinGeckoApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,7 +64,6 @@ enum class Chain(val displayName: String, val chainId: Int, val symbol: String) 
 
 @HiltViewModel
 class Web3ViewModel @Inject constructor(
-    private val coinGeckoApi: CoinGeckoApi,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 

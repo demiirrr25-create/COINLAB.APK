@@ -5,7 +5,8 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.coinlab.app.data.local.dao.PriceAlertDao
-import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.notification.NotificationHelper
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -15,7 +16,7 @@ class PriceAlertWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val priceAlertDao: PriceAlertDao,
-    private val coinGeckoApi: CoinGeckoApi,
+    private val binanceApi: BinanceApi,
     private val notificationHelper: NotificationHelper
 ) : CoroutineWorker(context, workerParams) {
 
@@ -24,20 +25,15 @@ class PriceAlertWorker @AssistedInject constructor(
             val activeAlerts = priceAlertDao.getActiveAlerts()
             if (activeAlerts.isEmpty()) return Result.success()
 
-            // Get unique coin IDs
-            val coinIds = activeAlerts.map { it.coinId }.distinct()
-            val idsParam = coinIds.joinToString(",")
-
-            // Fetch current prices
-            val priceResponse = coinGeckoApi.getSimplePrice(
-                ids = idsParam,
-                currencies = "usd"
-            )
+            // Fetch all prices from Binance (free, no API key)
+            val tickers = binanceApi.get24hrTicker()
+            val tickerMap = tickers.associateBy { it.symbol }
 
             // Check each alert
             for (alert in activeAlerts) {
-                val coinPrices = priceResponse[alert.coinId] ?: continue
-                val currentPrice = coinPrices["usd"] ?: continue
+                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(alert.coinId) ?: continue
+                val ticker = tickerMap[binanceSymbol] ?: continue
+                val currentPrice = ticker.lastPrice?.toDoubleOrNull() ?: continue
 
                 val triggered = if (alert.isAbove) {
                     currentPrice >= alert.targetPrice

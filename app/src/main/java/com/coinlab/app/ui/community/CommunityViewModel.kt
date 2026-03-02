@@ -3,7 +3,8 @@ package com.coinlab.app.ui.community
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.api.CoinGeckoApi
+import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.api.BinanceApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -101,7 +102,7 @@ data class LeaderboardEntry(
 @HiltViewModel
 class CommunityViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
-    private val coinGeckoApi: CoinGeckoApi
+    private val binanceApi: BinanceApi
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CommunityUiState())
@@ -205,14 +206,15 @@ class CommunityViewModel @Inject constructor(
 
                 for ((coinId, symbol) in signalCoins) {
                     try {
-                        val ohlcData = coinGeckoApi.getOhlc(
-                            coinId = coinId,
-                            currency = "usd",
-                            days = "14"
+                        val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: continue
+                        val klines = binanceApi.getKlines(
+                            symbol = binanceSymbol,
+                            interval = "1d",
+                            limit = 14
                         )
 
-                        if (ohlcData.size >= 14) {
-                            val closes = ohlcData.map { it.getOrNull(4) ?: it.last() }
+                        if (klines.size >= 14) {
+                            val closes = klines.map { (it.getOrNull(4) as? String)?.toDoubleOrNull() ?: 0.0 }
                             val rsi = calculateRSI(closes)
                             val currentPrice = closes.last()
                             val prevPrice = closes[closes.size - 2]
