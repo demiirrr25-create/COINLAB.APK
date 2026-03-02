@@ -31,6 +31,7 @@ class CoinRepositoryImpl @Inject constructor(
 
     companion object {
         private const val CACHE_DURATION_MS = 2 * 60 * 1000L // 2 minutes
+        private const val STALE_OK_MS = 10 * 60 * 1000L // Stale cache OK up to 10 minutes
     }
 
     override fun getCoins(
@@ -41,30 +42,31 @@ class CoinRepositoryImpl @Inject constructor(
         sparkline: Boolean
     ): Flow<Result<List<Coin>>> = flow {
         try {
-            // Check cache first
+            // Check cache first — stale-while-revalidate pattern
             val lastCached = coinDao.getLastCachedTime()
-            val isCacheValid = lastCached != null &&
-                    (System.currentTimeMillis() - lastCached) < CACHE_DURATION_MS
+            val cacheAge = if (lastCached != null) System.currentTimeMillis() - lastCached else Long.MAX_VALUE
 
-            if (isCacheValid && page == 1) {
+            if (page == 1 && cacheAge < STALE_OK_MS) {
                 val entities = coinDao.getAllCoins().first()
                 if (entities.isNotEmpty()) {
+                    // Emit cached data IMMEDIATELY for instant UI
                     emit(Result.success(entities.map { it.toDomain() }))
-                    return@flow // Cache valid — don't fetch from network (avoid double-emit)
+                    // If cache is fresh enough, skip network
+                    if (cacheAge < CACHE_DURATION_MS) return@flow
+                    // Otherwise continue to fetch fresh data (will emit again)
                 }
             }
 
             // PRIMARY: Fetch from Binance (no API key, fast, reliable)
             val coins = fetchCoinsFromBinance(perPage)
             if (coins != null && coins.isNotEmpty()) {
-                // Cache results
+                // Cache results in background
                 if (page == 1) {
                     try {
                         coinDao.deleteAll()
                         coinDao.insertAll(coins.map { it.toEntity() })
                     } catch (e: Exception) {
                         android.util.Log.w("CoinRepo", "Room cache write failed: ${e.message}")
-                        // Don't fail the request just because caching failed
                     }
                 }
                 emit(Result.success(coins))
@@ -217,11 +219,13 @@ class CoinRepositoryImpl @Inject constructor(
 
     override fun getCoinDetail(coinId: String): Flow<Result<CoinDetail>> = flow {
         try {
-            // Try Binance ticker for basic data first
+            // Try cached ticker first (instant, no network call)
             val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId)
             if (binanceSymbol != null) {
                 try {
-                    val ticker = binanceApi.getTickerBySymbol(binanceSymbol)
+                    // Use shared cache first for instant response
+                    val cachedTicker = tickerCache.getTickerBySymbol(binanceSymbol)
+                    val ticker = cachedTicker ?: binanceApi.getTickerBySymbol(binanceSymbol)
                     val meta = BinanceCoinMapper.getMetaByCoinId(coinId)
                     if (meta != null && ticker.lastPrice != null) {
                         val price = ticker.lastPrice.toDoubleOrNull() ?: 0.0

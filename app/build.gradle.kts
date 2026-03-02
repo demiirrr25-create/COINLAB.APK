@@ -15,8 +15,8 @@ android {
         applicationId = "com.coinlab.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "7.6"
+        versionCode = 23
+        versionName = "7.6.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

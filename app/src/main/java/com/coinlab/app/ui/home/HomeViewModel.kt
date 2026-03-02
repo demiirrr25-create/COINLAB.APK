@@ -13,6 +13,8 @@ import com.coinlab.app.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,20 +62,21 @@ class HomeViewModel @Inject constructor(
     private var symbolIndexMap: Map<String, Int> = emptyMap()
 
     init {
-        // Load display name once
+        // Load preferences and data in parallel for faster startup
         viewModelScope.launch {
             try {
-                val name = authPreferences.displayName.first()
-                _uiState.update { it.copy(displayName = name) }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
-        }
-        // Load currency once and start data loading
-        viewModelScope.launch {
-            try {
-                val currency = userPreferences.currency.first()
-                _uiState.update { it.copy(currency = currency) }
+                // Fire both pref reads in parallel using coroutineScope
+                coroutineScope {
+                    val nameDeferred = async {
+                        try { authPreferences.displayName.first() } catch (_: Exception) { "" }
+                    }
+                    val currencyDeferred = async {
+                        try { userPreferences.currency.first() } catch (_: Exception) { "USD" }
+                    }
+                    val name = nameDeferred.await()
+                    val currency = currencyDeferred.await()
+                    _uiState.update { it.copy(displayName = name, currency = currency) }
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
