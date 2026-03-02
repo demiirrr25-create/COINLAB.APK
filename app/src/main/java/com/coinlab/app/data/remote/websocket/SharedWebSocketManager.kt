@@ -94,8 +94,8 @@ class SharedWebSocketManager @Inject constructor(
             } catch (e: Exception) {
                 Log.w(TAG, "WebSocket collection ended: ${e.message}")
                 // Auto-reconnect with exponential backoff if still have subscribers
-                if (subscriberCount.get() > 0) {
-                    val delayMs = minOf(3000L * (1 shl reconnectAttempt), 60_000L)
+                if (subscriberCount.get() > 0 && reconnectAttempt < 15) {
+                    val delayMs = minOf(3000L * (1L shl minOf(reconnectAttempt, 5)), 60_000L)
                     reconnectAttempt++
                     Log.d(TAG, "Reconnecting in ${delayMs}ms (attempt=$reconnectAttempt)")
                     delay(delayMs)

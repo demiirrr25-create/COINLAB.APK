@@ -26,7 +26,6 @@ object BinanceCoinMapper {
         "AVAXUSDT" to CoinMeta("avalanche-2", "AVAX", "Avalanche", "https://assets.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png"),
         "LINKUSDT" to CoinMeta("chainlink", "LINK", "Chainlink", "https://assets.coingecko.com/coins/images/877/large/chainlink-new-logo.png"),
         "SHIBUSDT" to CoinMeta("shiba-inu", "SHIB", "Shiba Inu", "https://assets.coingecko.com/coins/images/11939/large/shiba.png"),
-        "MATICUSDT" to CoinMeta("matic-network", "MATIC", "Polygon", "https://assets.coingecko.com/coins/images/4713/large/polygon.png"),
         "LTCUSDT" to CoinMeta("litecoin", "LTC", "Litecoin", "https://assets.coingecko.com/coins/images/2/large/litecoin.png"),
         "UNIUSDT" to CoinMeta("uniswap", "UNI", "Uniswap", "https://assets.coingecko.com/coins/images/12504/large/uniswap.png"),
         "ATOMUSDT" to CoinMeta("cosmos", "ATOM", "Cosmos", "https://assets.coingecko.com/coins/images/1481/large/cosmos_hub.png"),
@@ -64,7 +63,7 @@ object BinanceCoinMapper {
         "FETUSDT" to CoinMeta("fetch-ai", "FET", "Fetch.ai", "https://assets.coingecko.com/coins/images/5681/large/Fetch.jpg"),
         "PEPEUSDT" to CoinMeta("pepe", "PEPE", "Pepe", "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg"),
         "WIFUSDT" to CoinMeta("dogwifcoin", "WIF", "dogwifhat", "https://assets.coingecko.com/coins/images/33566/large/dogwifhat.jpg"),
-        "POLUSDT" to CoinMeta("matic-network", "POL", "Polygon", "https://assets.coingecko.com/coins/images/4713/large/polygon.png")
+        "POLUSDT" to CoinMeta("polygon-ecosystem-token", "POL", "Polygon", "https://assets.coingecko.com/coins/images/4713/large/polygon.png")
     )
 
     // Reverse map: coinId → Binance symbol
@@ -83,7 +82,7 @@ object BinanceCoinMapper {
         "bitcoin" to 1, "ethereum" to 2, "binancecoin" to 3, "solana" to 4,
         "ripple" to 5, "cardano" to 6, "dogecoin" to 7, "tron" to 8,
         "polkadot" to 9, "avalanche-2" to 10, "chainlink" to 11, "shiba-inu" to 12,
-        "matic-network" to 13, "litecoin" to 14, "uniswap" to 15, "cosmos" to 16,
+        "polygon-ecosystem-token" to 13, "litecoin" to 14, "uniswap" to 15, "cosmos" to 16,
         "near" to 17, "aptos" to 18, "sui" to 19, "internet-computer" to 20,
         "ethereum-classic" to 21, "filecoin" to 22, "stellar" to 23, "vechain" to 24,
         "hedera-hashgraph" to 25, "aave" to 26, "algorand" to 27, "fantom" to 28,

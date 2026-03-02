@@ -9,6 +9,8 @@ import com.coinlab.app.domain.model.PortfolioEntry
 import com.coinlab.app.domain.model.TransactionType
 import com.coinlab.app.domain.repository.PortfolioRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +56,8 @@ class PortfolioViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PortfolioUiState())
     val uiState: StateFlow<PortfolioUiState> = _uiState.asStateFlow()
 
+    private var portfolioJob: Job? = null
+
     private val _holdings = MutableStateFlow<List<PortfolioHolding>>(emptyList())
     val holdings: StateFlow<List<PortfolioHolding>> = _holdings.asStateFlow()
 
@@ -66,7 +70,8 @@ class PortfolioViewModel @Inject constructor(
     }
 
     fun loadPortfolio() {
-        viewModelScope.launch {
+        portfolioJob?.cancel()
+        portfolioJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             portfolioRepository.getAllEntries().collectLatest { entries ->
                 _uiState.update { it.copy(entries = entries) }

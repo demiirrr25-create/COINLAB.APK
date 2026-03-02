@@ -15,14 +15,14 @@ android {
         applicationId = "com.coinlab.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "7.5.1"
+        versionCode = 20
+        versionName = "7.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "COINGECKO_BASE_URL", "\"https://api.coingecko.com/api/v3/\"")
         buildConfigField("String", "CRYPTOCOMPARE_BASE_URL", "\"https://min-api.cryptocompare.com/\"")
-        buildConfigField("String", "BINANCE_WS_URL", "\"wss://stream.binance.com:9443/ws/\"")
+        buildConfigField("String", "BINANCE_WS_URL", "\"wss://stream.binance.com:9443/\"")
     }
 
     signingConfigs {

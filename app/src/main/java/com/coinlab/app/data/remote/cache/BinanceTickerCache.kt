@@ -59,9 +59,9 @@ class BinanceTickerCache @Inject constructor(
                 lastFetchTime = System.currentTimeMillis()
                 tickers
             } catch (e: Exception) {
-                // Return stale cache on error rather than crashing
+                // Return stale cache on error; return empty list if no cache (never throw on first load)
                 if (cachedTickers.isNotEmpty()) cachedTickers
-                else throw e
+                else emptyList()
             }
         }
     }

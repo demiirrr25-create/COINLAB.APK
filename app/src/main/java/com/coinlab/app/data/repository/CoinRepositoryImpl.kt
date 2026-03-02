@@ -131,6 +131,7 @@ class CoinRepositoryImpl @Inject constructor(
                         lastUpdated = System.currentTimeMillis().toString()
                     )
                 }
+                .distinctBy { it.id }
                 .sortedBy { it.marketCapRank }
                 .take(limit)
         } catch (_: Exception) {

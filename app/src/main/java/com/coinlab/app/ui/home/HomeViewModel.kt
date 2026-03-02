@@ -13,6 +13,7 @@ import com.coinlab.app.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,12 +87,14 @@ class HomeViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
-                val jobs = listOf(
-                    launch { loadCoins() },
-                    launch { loadFearGreedIndex() },
-                    launch { loadGlobalData() }
-                )
-                jobs.joinAll()
+                supervisorScope {
+                    val jobs = listOf(
+                        launch { loadCoins() },
+                        launch { loadFearGreedIndex() },
+                        launch { loadGlobalData() }
+                    )
+                    jobs.joinAll()
+                }
                 _uiState.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -106,12 +109,14 @@ class HomeViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isRefreshing = true) }
                 tickerCache.invalidate()
-                val jobs = listOf(
-                    launch { loadCoins() },
-                    launch { loadFearGreedIndex() },
-                    launch { loadGlobalData() }
-                )
-                jobs.joinAll()
+                supervisorScope {
+                    val jobs = listOf(
+                        launch { loadCoins() },
+                        launch { loadFearGreedIndex() },
+                        launch { loadGlobalData() }
+                    )
+                    jobs.joinAll()
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
