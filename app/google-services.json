@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "484421142982",
+    "firebase_url": "https://com-coinlab-app-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "com-coinlab-app",
     "storage_bucket": "com-coinlab-app.firebasestorage.app"
   },

@@ -132,6 +132,7 @@ class CommunityRealtimeRepository @Inject constructor(
      */
     suspend fun createPost(post: RealtimePost, imageUri: Uri? = null): String {
         try {
+            android.util.Log.d("CommunityRTDB", "createPost START — author=${post.authorName}, dbUrl=${database.reference.toString()}")
             val imageUrl = if (imageUri != null) uploadImage(imageUri) else ""
             val key = postsRef.push().key ?: UUID.randomUUID().toString()
             val finalPost = post.copy(
@@ -139,12 +140,13 @@ class CommunityRealtimeRepository @Inject constructor(
                 imageUrl = imageUrl,
                 createdAt = System.currentTimeMillis()
             )
+            android.util.Log.d("CommunityRTDB", "Writing post to path: ${postsRef.child(key).path}")
             postsRef.child(key).setValue(finalPost).await()
             android.util.Log.d("CommunityRTDB", "Post created successfully: id=$key, author=${post.authorName}")
             return key
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            android.util.Log.e("CommunityRTDB", "createPost FAILED: ${e.message}", e)
+            android.util.Log.e("CommunityRTDB", "createPost FAILED [${e.javaClass.simpleName}]: ${e.message}", e)
             throw e
         }
     }

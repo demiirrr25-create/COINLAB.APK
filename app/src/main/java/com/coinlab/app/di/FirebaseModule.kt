@@ -26,7 +26,11 @@ object FirebaseModule {
     @Singleton
     fun provideFirebaseDatabase(): FirebaseDatabase {
         val database = FirebaseDatabase.getInstance("https://com-coinlab-app-default-rtdb.europe-west1.firebasedatabase.app/")
-        database.setPersistenceEnabled(true)
+        try {
+            database.setPersistenceEnabled(true)
+        } catch (_: Exception) {
+            // Already set — safe to ignore
+        }
         return database
     }
 
