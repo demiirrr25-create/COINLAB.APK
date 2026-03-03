@@ -32,7 +32,7 @@ class SharedWebSocketManager @Inject constructor(
 
     private val _tickerFlow = MutableSharedFlow<TickerUpdate>(
         replay = 0,
-        extraBufferCapacity = 128
+        extraBufferCapacity = 256 // v7.7: increased buffer for 250+ coins
     )
 
     private val subscriberCount = AtomicInteger(0)

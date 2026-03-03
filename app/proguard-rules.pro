@@ -65,3 +65,30 @@
 # Keep domain models for serialization
 -keep class com.coinlab.app.domain.model.** { *; }
 -keep class com.coinlab.app.data.local.entity.** { *; }
+
+# v7.7 — Coil image loading (critical for coin logos)
+-dontwarn coil.**
+-keep class coil.** { *; }
+
+# v7.7 — Paging 3 (infinite scroll in market list)
+-keep class androidx.paging.** { *; }
+-dontwarn androidx.paging.**
+
+# v7.7 — DataStore Preferences
+-keep class androidx.datastore.** { *; }
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
+    <fields>;
+}
+
+# v7.7 — Lottie animations
+-dontwarn com.airbnb.lottie.**
+-keep class com.airbnb.lottie.** { *; }
+
+# v7.7 — Biometric authentication
+-keep class androidx.biometric.** { *; }
+-dontwarn androidx.biometric.**
+
+# v7.7 — DynamicCoinRegistry / HardcodedCoinFallback data classes
+-keep class com.coinlab.app.data.remote.DynamicCoinRegistry$CoinMeta { *; }
+-keep class com.coinlab.app.data.remote.HardcodedCoinFallback$FallbackCoinEntry { *; }
+-keep class com.coinlab.app.data.remote.BinanceCoinMapper { *; }

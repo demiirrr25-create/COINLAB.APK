@@ -3,8 +3,9 @@ package com.coinlab.app.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.AuthPreferences
-import com.coinlab.app.data.remote.api.GitHubApi
+import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,30 +16,20 @@ import javax.inject.Inject
 
 data class AuthUiState(
     val isLoggedIn: Boolean = false,
-    val isLoading: Boolean = true,
-    val githubUsername: String = "",
+    val isLoading: Boolean = false,
     val rememberMe: Boolean = false,
     val displayName: String = "",
+    val email: String = "",
     val avatarUrl: String = "",
-    val usernameError: String? = null,
     val generalError: String? = null,
     val loginSuccess: Boolean = false,
-    val registerSuccess: Boolean = false,
-    // Legacy fields kept for compatibility
-    val email: String = "",
-    val password: String = "",
-    val confirmPassword: String = "",
-    val emailError: String? = null,
-    val passwordError: String? = null,
-    val confirmPasswordError: String? = null,
-    val nameError: String? = null,
-    val passwordStrength: Int = 0
+    val registerSuccess: Boolean = false
 )
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authPreferences: AuthPreferences,
-    private val gitHubApi: GitHubApi
+    private val firebaseAuthManager: FirebaseAuthManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -48,59 +39,61 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val loggedIn = authPreferences.isLoggedIn.first()
-                _uiState.update { it.copy(isLoggedIn = loggedIn, isLoading = false) }
-            } catch (_: Exception) {
-                _uiState.update { it.copy(isLoading = false) }
-            }
+                _uiState.update { it.copy(isLoggedIn = loggedIn) }
+            } catch (_: Exception) { }
         }
-    }
-
-    fun onGitHubUsernameChange(username: String) {
-        _uiState.update { it.copy(githubUsername = username, usernameError = null, generalError = null) }
     }
 
     fun onRememberMeChange(checked: Boolean) {
         _uiState.update { it.copy(rememberMe = checked) }
     }
 
-    // Legacy handlers for compatibility
-    fun onEmailChange(email: String) {
-        _uiState.update { it.copy(email = email, emailError = null, generalError = null) }
-    }
-    fun onPasswordChange(password: String) {
-        _uiState.update { it.copy(password = password, passwordError = null, generalError = null) }
-    }
-    fun onConfirmPasswordChange(confirmPassword: String) {
-        _uiState.update { it.copy(confirmPassword = confirmPassword, confirmPasswordError = null) }
-    }
-    fun onDisplayNameChange(name: String) {
-        _uiState.update { it.copy(displayName = name, nameError = null) }
-    }
-
-    fun loginWithGitHub() {
-        val username = _uiState.value.githubUsername.trim()
-
-        if (username.isBlank()) {
-            _uiState.update { it.copy(usernameError = "GitHub kullanıcı adı girin") }
-            return
-        }
-
-        if (username.length < 1 || username.contains(" ")) {
-            _uiState.update { it.copy(usernameError = "Geçerli bir GitHub kullanıcı adı girin") }
-            return
-        }
-
+    /**
+     * Process Google Sign-In result with the ID token from Credential Manager.
+     * Tries Firebase auth first; if Firebase fails, falls back to local Google profile auth.
+     */
+    fun signInWithGoogle(
+        idToken: String,
+        googleEmail: String = "",
+        googleDisplayName: String = "",
+        googlePhotoUrl: String = ""
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, generalError = null) }
             try {
-                val user = gitHubApi.getUser(username)
-                val displayName = user.name ?: user.login
-                val avatarUrl = user.avatar_url
+                // Try Firebase authentication first
+                val firebaseUser = try {
+                    firebaseAuthManager.signInWithGoogle(idToken)
+                } catch (firebaseError: Exception) {
+                    android.util.Log.w("AuthViewModel", "Firebase Google auth failed, using direct Google profile", firebaseError)
+                    null
+                }
 
-                authPreferences.loginWithGitHub(
-                    username = user.login,
+                val displayName: String
+                val email: String
+                val photoUrl: String
+                val uid: String
+
+                if (firebaseUser != null) {
+                    // Firebase auth succeeded — use Firebase user data
+                    displayName = firebaseUser.displayName ?: googleDisplayName.ifEmpty { "Kullanıcı" }
+                    email = firebaseUser.email ?: googleEmail
+                    photoUrl = firebaseUser.photoUrl?.toString() ?: googlePhotoUrl
+                    uid = firebaseUser.uid
+                } else {
+                    // Firebase failed — use Google credential data directly
+                    displayName = googleDisplayName.ifEmpty { "Kullanıcı" }
+                    email = googleEmail
+                    photoUrl = googlePhotoUrl
+                    uid = "google_${googleEmail.hashCode()}"
+                }
+
+                authPreferences.loginWithGoogle(
+                    uid = uid,
+                    email = email,
                     displayName = displayName,
-                    avatarUrl = avatarUrl,
+                    photoUrl = photoUrl,
+                    idToken = idToken,
                     rememberMe = _uiState.value.rememberMe
                 )
 
@@ -110,14 +103,20 @@ class AuthViewModel @Inject constructor(
                         isLoggedIn = true,
                         loginSuccess = true,
                         displayName = displayName,
-                        avatarUrl = avatarUrl
+                        email = email,
+                        avatarUrl = photoUrl
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 val errorMsg = when {
-                    e.message?.contains("404") == true -> "GitHub kullanıcısı bulunamadı: @$username"
-                    e.message?.contains("403") == true -> "GitHub API limiti aşıldı, lütfen biraz bekleyin"
-                    else -> "Bağlantı hatası. İnternet bağlantınızı kontrol edin."
+                    e.message?.contains("network", ignoreCase = true) == true ->
+                        "Bağlantı hatası. İnternet bağlantınızı kontrol edin."
+                    e.message?.contains("canceled", ignoreCase = true) == true ||
+                    e.message?.contains("cancelled", ignoreCase = true) == true ->
+                        null // User cancelled, don't show error
+                    else ->
+                        "Giriş başarısız: ${e.localizedMessage ?: "Bilinmeyen hata"}"
                 }
                 _uiState.update {
                     it.copy(isLoading = false, generalError = errorMsg)
@@ -126,18 +125,22 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    // Keep legacy login for skip functionality
-    fun login() {
-        loginWithGitHub()
-    }
-
-    fun register() {
-        loginWithGitHub()
+    /**
+     * Handle Google Sign-In error from Credential Manager.
+     */
+    fun onGoogleSignInError(message: String?) {
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                generalError = message ?: "Google girişi başarısız oldu"
+            )
+        }
     }
 
     fun logout() {
         viewModelScope.launch {
             try {
+                firebaseAuthManager.signOut()
                 authPreferences.logout()
                 _uiState.update {
                     AuthUiState(isLoggedIn = false, isLoading = false)
@@ -149,11 +152,9 @@ class AuthViewModel @Inject constructor(
     fun resetState() {
         _uiState.update {
             it.copy(
-                githubUsername = "", generalError = null, usernameError = null,
-                loginSuccess = false, registerSuccess = false,
-                email = "", password = "", confirmPassword = "", displayName = "",
-                emailError = null, passwordError = null, confirmPasswordError = null,
-                nameError = null
+                generalError = null,
+                loginSuccess = false,
+                registerSuccess = false
             )
         }
     }

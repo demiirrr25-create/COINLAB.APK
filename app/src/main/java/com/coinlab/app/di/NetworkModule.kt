@@ -31,7 +31,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideConnectionPool(): ConnectionPool = ConnectionPool(10, 60, TimeUnit.SECONDS)
+    fun provideConnectionPool(): ConnectionPool = ConnectionPool(15, 120, TimeUnit.SECONDS) // v7.7: more connections, longer keep-alive
 
     @Provides
     @Singleton

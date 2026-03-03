@@ -94,6 +94,7 @@ fun CoinLabNavHost(
     deepLinkCoinId: String? = null,
     autoLogin: Boolean = false
 ) {
+    val authViewModel: AuthViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -311,6 +312,7 @@ fun CoinLabNavHost(
                         navController.navigate(Screen.Wallet.route)
                     },
                     onLogout = {
+                        authViewModel.logout()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }

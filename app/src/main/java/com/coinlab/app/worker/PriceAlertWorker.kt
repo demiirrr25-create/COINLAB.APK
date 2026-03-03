@@ -5,7 +5,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.coinlab.app.data.local.dao.PriceAlertDao
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.notification.NotificationHelper
 import dagger.assisted.Assisted
@@ -17,7 +17,8 @@ class PriceAlertWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val priceAlertDao: PriceAlertDao,
     private val tickerCache: BinanceTickerCache,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val coinRegistry: DynamicCoinRegistry
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -30,7 +31,7 @@ class PriceAlertWorker @AssistedInject constructor(
 
             // Check each alert
             for (alert in activeAlerts) {
-                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(alert.coinId) ?: continue
+                val binanceSymbol = coinRegistry.getBinanceSymbolByCoinId(alert.coinId) ?: continue
                 val ticker = tickerMap[binanceSymbol] ?: continue
                 val currentPrice = ticker.lastPrice?.toDoubleOrNull() ?: continue
 

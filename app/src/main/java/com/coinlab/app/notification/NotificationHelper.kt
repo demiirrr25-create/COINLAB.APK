@@ -98,10 +98,34 @@ class NotificationHelper @Inject constructor(
         notificationManager.notify(title.hashCode(), notification)
     }
 
+    fun showCommunityNotification(title: String, message: String, notificationId: Int = NOTIFICATION_ID_COMMUNITY) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("navigate_to", "community")
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 3, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_COMMUNITY)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+    }
+
     companion object {
         const val CHANNEL_PRICE_ALERTS = "price_alerts"
         const val CHANNEL_PORTFOLIO_UPDATES = "portfolio_updates"
         const val CHANNEL_CRYPTO_NEWS = "crypto_news"
+        const val CHANNEL_COMMUNITY = "community_notifications"
         const val NOTIFICATION_ID_PORTFOLIO = 1001
+        const val NOTIFICATION_ID_COMMUNITY = 2001
     }
 }

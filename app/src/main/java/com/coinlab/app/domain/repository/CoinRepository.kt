@@ -1,5 +1,6 @@
 package com.coinlab.app.domain.repository
 
+import androidx.paging.PagingData
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.model.CoinDetail
 import com.coinlab.app.domain.model.MarketChart
@@ -9,10 +10,16 @@ interface CoinRepository {
     fun getCoins(
         currency: String = "usd",
         orderBy: String = "market_cap_desc",
-        perPage: Int = 100,
+        perPage: Int = 1000,
         page: Int = 1,
         sparkline: Boolean = true
     ): Flow<Result<List<Coin>>>
+
+    /**
+     * Get paginated coins from Room database.
+     * Data is pre-fetched from Binance and cached in Room.
+     */
+    fun getPagedCoins(): Flow<PagingData<Coin>>
 
     fun searchCoins(query: String): Flow<Result<List<Coin>>>
 

@@ -25,6 +25,9 @@ class AuthPreferences(private val context: Context) {
         val REGISTERED_EMAILS = stringPreferencesKey("registered_emails")
         val GITHUB_USERNAME = stringPreferencesKey("github_username")
         val REMEMBER_ME = booleanPreferencesKey("remember_me")
+        val GOOGLE_ID_TOKEN = stringPreferencesKey("google_id_token")
+        val GOOGLE_UID = stringPreferencesKey("google_uid")
+        val AUTH_PROVIDER = stringPreferencesKey("auth_provider")
     }
 
     val isLoggedIn: Flow<Boolean> = context.authDataStore.data.map { prefs ->
@@ -63,6 +66,10 @@ class AuthPreferences(private val context: Context) {
         prefs[REMEMBER_ME] ?: false
     }
 
+    val authProvider: Flow<String> = context.authDataStore.data.map { prefs ->
+        prefs[AUTH_PROVIDER] ?: ""
+    }
+
     suspend fun login(email: String, displayName: String, token: String) {
         context.authDataStore.edit { prefs ->
             prefs[IS_LOGGED_IN] = true
@@ -86,6 +93,28 @@ class AuthPreferences(private val context: Context) {
             prefs[USER_EMAIL] = "$username@github.com"
             prefs[AUTH_TOKEN] = "github_${System.currentTimeMillis()}"
             prefs[REMEMBER_ME] = rememberMe
+            prefs[AUTH_PROVIDER] = "github"
+        }
+    }
+
+    suspend fun loginWithGoogle(
+        uid: String,
+        email: String,
+        displayName: String,
+        photoUrl: String,
+        idToken: String,
+        rememberMe: Boolean
+    ) {
+        context.authDataStore.edit { prefs ->
+            prefs[IS_LOGGED_IN] = true
+            prefs[GOOGLE_UID] = uid
+            prefs[USER_EMAIL] = email
+            prefs[DISPLAY_NAME] = displayName
+            prefs[AVATAR_URL] = photoUrl
+            prefs[GOOGLE_ID_TOKEN] = idToken
+            prefs[AUTH_TOKEN] = "google_${System.currentTimeMillis()}"
+            prefs[REMEMBER_ME] = rememberMe
+            prefs[AUTH_PROVIDER] = "google"
         }
     }
 

@@ -8,26 +8,74 @@ import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import coil.request.CachePolicy
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.worker.PriceAlertWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltAndroidApp
-class CoinLabApp : Application(), Configuration.Provider {
+class CoinLabApp : Application(), Configuration.Provider, ImageLoaderFactory {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var coinRegistry: DynamicCoinRegistry
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
 
+    /**
+     * v7.7 — Optimized Coil ImageLoader for 250+ coin logos.
+     * 50MB memory cache + 100MB disk cache + crossfade.
+     * Coin icons rarely change, so aggressive caching is safe.
+     */
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.20) // ~50MB on most devices
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("coil_cache"))
+                    .maxSizeBytes(100L * 1024 * 1024) // 100MB
+                    .build()
+            }
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .crossfade(true)
+            .crossfade(200)
+            .respectCacheHeaders(false) // Always use our cache policy
+            .build()
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
         schedulePriceAlertWorker()
+        // v7.9: Early-init DynamicCoinRegistry so market data is ready when user opens the screen
+        appScope.launch {
+            try {
+                coinRegistry.initialize()
+                android.util.Log.d("CoinLabApp", "DynamicCoinRegistry pre-initialized: ${coinRegistry.getCoinCount()} coins")
+            } catch (_: Exception) { }
+        }
     }
 
     private fun createNotificationChannels() {
@@ -59,8 +107,16 @@ class CoinLabApp : Application(), Configuration.Provider {
             description = getString(R.string.channel_news_desc)
         }
 
+        val communityChannel = NotificationChannel(
+            CHANNEL_COMMUNITY,
+            getString(R.string.channel_community),
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = getString(R.string.channel_community_desc)
+        }
+
         manager.createNotificationChannels(
-            listOf(priceAlertChannel, portfolioChannel, newsChannel)
+            listOf(priceAlertChannel, portfolioChannel, newsChannel, communityChannel)
         )
         } catch (_: Exception) { }
     }
@@ -69,6 +125,7 @@ class CoinLabApp : Application(), Configuration.Provider {
         const val CHANNEL_PRICE_ALERTS = "price_alerts"
         const val CHANNEL_PORTFOLIO = "portfolio_updates"
         const val CHANNEL_NEWS = "crypto_news"
+        const val CHANNEL_COMMUNITY = "community_notifications"
     }
 
     private fun schedulePriceAlertWorker() {

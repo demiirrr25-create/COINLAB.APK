@@ -1,5 +1,8 @@
 package com.coinlab.app.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,7 +50,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,7 +71,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.coinlab.app.R
 import com.coinlab.app.ui.components.CoinListItem
 import com.coinlab.app.ui.theme.*
+import com.coinlab.app.data.remote.api.FearGreedDataItem
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
@@ -102,6 +110,7 @@ fun HomeScreen(
                 MarketSummaryCard(
                     fearGreedValue = uiState.fearGreedValue,
                     fearGreedLabel = uiState.fearGreedLabel,
+                    fearGreedHistory = uiState.fearGreedHistory,
                     totalMarketCap = uiState.totalMarketCap,
                     totalVolume24h = uiState.totalVolume24h,
                     btcDominance = uiState.btcDominance,
@@ -446,6 +455,7 @@ private fun AnimatedFlaskIcon(modifier: Modifier = Modifier) {
 private fun MarketSummaryCard(
     fearGreedValue: Int,
     fearGreedLabel: String,
+    fearGreedHistory: List<FearGreedDataItem>,
     totalMarketCap: Double,
     totalVolume24h: Double,
     btcDominance: Double,
@@ -454,6 +464,8 @@ private fun MarketSummaryCard(
     activeCryptos: Int,
     currency: String
 ) {
+    var showFearGreedHistory by remember { mutableStateOf(false) }
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -490,8 +502,11 @@ private fun MarketSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Fear & Greed
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Fear & Greed — clickable to show history
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { showFearGreedHistory = !showFearGreedHistory }
+                ) {
                     val gaugeColor = when {
                         fearGreedValue <= 25 -> CoinLabRed
                         fearGreedValue <= 45 -> Color(0xFFFF9800)
@@ -643,6 +658,139 @@ private fun MarketSummaryCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 fontSize = 9.sp
                             )
+                        }
+                    }
+                }
+            }
+
+            // Fear & Greed History — expandable section
+            AnimatedVisibility(
+                visible = showFearGreedHistory && fearGreedHistory.isNotEmpty(),
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.fear_greed_history),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.last_30_days),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Mini sparkline-style chart of fear & greed values
+                    val historyValues = fearGreedHistory.reversed().mapNotNull { it.value?.toDoubleOrNull() }
+                    if (historyValues.size >= 2) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(60.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val w = size.width
+                                val h = size.height
+                                val maxVal = 100f
+                                val minVal = 0f
+                                val stepX = w / (historyValues.size - 1).coerceAtLeast(1)
+
+                                val path = androidx.compose.ui.graphics.Path()
+                                for (i in historyValues.indices) {
+                                    val x = i * stepX
+                                    val y = h - ((historyValues[i].toFloat() - minVal) / (maxVal - minVal) * h)
+                                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                }
+
+                                // Gradient fill
+                                val fillPath = androidx.compose.ui.graphics.Path().apply {
+                                    addPath(path)
+                                    lineTo((historyValues.size - 1) * stepX, h)
+                                    lineTo(0f, h)
+                                    close()
+                                }
+                                drawPath(
+                                    path = fillPath,
+                                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFFFF9800).copy(alpha = 0.3f),
+                                            Color(0xFFFF9800).copy(alpha = 0.05f)
+                                        )
+                                    )
+                                )
+                                drawPath(
+                                    path = path,
+                                    color = Color(0xFFFF9800),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // History list (last 7 days)
+                    fearGreedHistory.take(7).forEach { item ->
+                        val value = item.value?.toIntOrNull() ?: 0
+                        val classification = item.value_classification ?: ""
+                        val timestamp = item.timestamp?.toLongOrNull()
+                        val dateStr = if (timestamp != null) {
+                            val date = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+                            date.format(DateTimeFormatter.ofPattern("dd MMM", Locale("tr")))
+                        } else ""
+                        val itemColor = when {
+                            value <= 25 -> CoinLabRed
+                            value <= 45 -> Color(0xFFFF9800)
+                            value <= 55 -> CoinLabGold
+                            value <= 75 -> CoinLabAqua
+                            else -> CoinLabGreen
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = dateStr,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(itemColor.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$value",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = itemColor,
+                                        fontSize = 8.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = classification,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = itemColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }

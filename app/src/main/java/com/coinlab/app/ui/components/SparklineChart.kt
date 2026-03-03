@@ -31,7 +31,7 @@ fun SparklineChart(
     val animProgress = remember { Animatable(0f) }
     LaunchedEffect(data) {
         animProgress.snapTo(0f)
-        animProgress.animateTo(1f, animationSpec = tween(600))
+        animProgress.animateTo(1f, animationSpec = tween(400))
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {

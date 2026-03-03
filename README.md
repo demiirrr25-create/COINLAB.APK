@@ -1,4 +1,4 @@
-# CoinLab v3.0 🪙
+# CoinLab v8.1 🪙
 
 **Türkiye'nin en kapsamlı kripto para takip uygulaması**
 
@@ -6,6 +6,31 @@
 [![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg)](https://android-arsenal.com/api?level=26)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-blue.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-purple.svg)](https://developer.android.com/jetpack/compose)
+
+---
+
+## 🚀 v7.7 — Devrim Güncellemesi
+
+### Performans & Hız
+- **R8 Full Mode** ile APK boyutu %30+ küçülme
+- **Coil görsel cache**: 100MB disk + 50MB bellek cache (coin logoları anında yüklenir)
+- **WebSocket buffer** 128→256 (250+ coin akışı için optimize)
+- **Connection Pool** 15 bağlantı / 120s keep-alive (daha hızlı API yanıtları)
+- **Metadata cache** 24h→12h (daha taze coin verileri)
+
+### 250+ Coin Desteği
+- **BinanceCoinMapper**: 50→250+ coin (TON, KAS, TAO, PEPE, WIF, BONK, JUP, EIGEN, HMSTR ve çok daha fazlası)
+- **HardcodedCoinFallback**: Temizlendi, 250 gerçek benzersiz Binance USDT çifti
+- **StaticFallbackData**: 20→50 coin (tam offline ilk açılış desteği)
+- **DynamicCoinRegistry**: Runtime'da 1000+ coin keşfi
+
+### Yeni Özellikler
+- Airdrop Takip Ekranı
+- Staking Yönetimi
+- Web3 Cüzdan Entegrasyonu
+- Coin Karşılaştırma
+- Teknik Analiz Ekranı
+- Topluluk Ekranı
 
 ---
 

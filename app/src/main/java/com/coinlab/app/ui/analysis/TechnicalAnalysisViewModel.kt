@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.domain.model.CoinDetail
@@ -61,7 +61,8 @@ class TechnicalAnalysisViewModel @Inject constructor(
     private val coinRepository: CoinRepository,
     private val binanceApi: BinanceApi,
     private val fearGreedApi: FearGreedApi,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val coinRegistry: DynamicCoinRegistry
 ) : ViewModel() {
 
     private val coinId: String = savedStateHandle.get<String>("coinId") ?: "bitcoin"
@@ -100,7 +101,7 @@ class TechnicalAnalysisViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, selectedTimeRange = days) }
             try {
-                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId) ?: "BTCUSDT"
+                val binanceSymbol = coinRegistry.getBinanceSymbolByCoinId(coinId) ?: "BTCUSDT"
                 // Map days to Binance kline interval + limit
                 val pair: Pair<String, Int> = when (days) {
                     "1" -> "1h" to 24

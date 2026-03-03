@@ -1,13 +1,16 @@
 package com.coinlab.app.data.remote.cache
 
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.api.BinanceTicker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,14 +18,15 @@ import javax.inject.Singleton
  * Centralized cache for Binance 24hr ticker data.
  * Prevents redundant API calls: all ViewModels share the same cached data.
  *
- * - Only fetches our ~50 supported symbols (not all 2000+)
+ * - Fetches up to 1000 supported symbols in batches of 200 (parallel)
  * - 15-second TTL — balance between freshness and API efficiency
  * - Mutex prevents duplicate network calls when multiple coroutines request simultaneously
  * - Stale-while-revalidate: returns stale cache immediately, refreshes in background
  */
 @Singleton
 class BinanceTickerCache @Inject constructor(
-    private val binanceApi: BinanceApi
+    private val binanceApi: BinanceApi,
+    private val coinRegistry: DynamicCoinRegistry
 ) {
     private val mutex = Mutex()
 
@@ -41,16 +45,19 @@ class BinanceTickerCache @Inject constructor(
     companion object {
         private const val CACHE_TTL_MS = 15_000L // 15 seconds
         private const val STALE_TTL_MS = 60_000L // Return stale up to 60s, refresh in background
-    }
-
-    // Pre-built symbols JSON — never changes at runtime, build once
-    private val symbolsJson: String by lazy {
-        BinanceCoinMapper.getAllBinanceSymbols()
-            .joinToString(",", prefix = "[", postfix = "]") { "\"$it\"" }
+        private const val BATCH_SIZE = 200 // Max symbols per Binance API call (URL length safe)
     }
 
     /**
-     * Get all supported tickers (cached, ~50 items).
+     * Build symbols JSON for a batch of symbols.
+     * Format: ["BTCUSDT","ETHUSDT",...]
+     */
+    private fun buildSymbolsJson(symbols: List<String>): String {
+        return symbols.joinToString(",", prefix = "[", postfix = "]") { "\"$it\"" }
+    }
+
+    /**
+     * Get all supported tickers (cached, up to ~1000 items).
      * Thread-safe; only one network call at a time.
      * Uses stale-while-revalidate: returns stale data instantly while refreshing in background.
      */
@@ -64,7 +71,6 @@ class BinanceTickerCache @Inject constructor(
         }
 
         // Stale but usable — return stale data, don't block
-        // (fetchFresh will be called by the caller or next request)
         if (!forceRefresh && cachedTickers.isNotEmpty() && age < STALE_TTL_MS) {
             // Trigger background refresh if not already fetching
             if (!isFetching) {
@@ -80,7 +86,8 @@ class BinanceTickerCache @Inject constructor(
     }
 
     /**
-     * Actually fetch from Binance API. Mutex-protected.
+     * Actually fetch from Binance API in batches of 200. Mutex-protected.
+     * Uses parallel batch requests for speed: 5×200 symbols ≈ 1 second.
      */
     private suspend fun fetchFresh(): List<BinanceTicker> {
         return mutex.withLock {
@@ -91,14 +98,39 @@ class BinanceTickerCache @Inject constructor(
             }
             isFetching = true
             try {
-                val tickers = binanceApi.getTickersBySymbols(symbolsJson)
-                cachedTickers = tickers
-                cachedTickerMap = tickers.associateBy { it.symbol ?: "" }
+                val allSymbols = coinRegistry.getAllBinanceSymbols().toList()
+                if (allSymbols.isEmpty()) {
+                    return@withLock cachedTickers.ifEmpty { emptyList() }
+                }
+
+                // Split into batches and fetch in parallel
+                val batches = allSymbols.chunked(BATCH_SIZE)
+                val allTickers = mutableListOf<BinanceTicker>()
+
+                coroutineScope {
+                    val deferredResults = batches.map { batch ->
+                        async(Dispatchers.IO) {
+                            try {
+                                val symbolsJson = buildSymbolsJson(batch)
+                                binanceApi.getTickersBySymbols(symbolsJson)
+                            } catch (e: Exception) {
+                                if (e is kotlinx.coroutines.CancellationException) throw e
+                                emptyList()
+                            }
+                        }
+                    }
+                    for (result in deferredResults.awaitAll()) {
+                        allTickers.addAll(result)
+                    }
+                }
+
+                cachedTickers = allTickers
+                cachedTickerMap = allTickers.associateBy { it.symbol ?: "" }
                 lastFetchTime = System.currentTimeMillis()
-                tickers
+                allTickers
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                // Return stale cache on error; return empty list if no cache (never throw on first load)
+                // Return stale cache on error
                 if (cachedTickers.isNotEmpty()) cachedTickers
                 else emptyList()
             } finally {

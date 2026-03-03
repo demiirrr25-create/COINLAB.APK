@@ -3,7 +3,7 @@
     <string name="app_name">CoinLab</string>
 
     <!-- Navigation -->
-    <string name="nav_home">Ana Sayfa</string>
+    <string name="nav_home">Ev</string>
     <string name="nav_market">Piyasa</string>
     <string name="nav_portfolio">Portföy</string>
     <string name="nav_news">Haberler</string>
@@ -125,6 +125,18 @@
     <string name="empty_watchlist">Takip listesi boş</string>
     <string name="coin">Coin</string>
 
+    <!-- Coin Categories -->
+    <string name="cat_layer1">Layer 1</string>
+    <string name="cat_layer2">Layer 2</string>
+    <string name="cat_defi">DeFi</string>
+    <string name="cat_meme">Meme</string>
+    <string name="cat_nft_gaming">NFT/Oyun</string>
+    <string name="cat_ai">Yapay Zeka</string>
+    <string name="cat_infra">Altyapı</string>
+    <string name="cat_exchange">Borsa</string>
+    <string name="cat_privacy">Gizlilik</string>
+    <string name="cat_stable_defi">Stabil DeFi</string>
+
     <!-- Missing Detail -->
     <string name="set_alert">Uyarı Kur</string>
     <string name="ath_change">ATH Değişim</string>
@@ -234,6 +246,12 @@
     <string name="see_all">Tümünü Gör</string>
     <string name="quick_access">Hızlı Erişim</string>
     <string name="btc_dominance">BTC Dominans</string>
+    <string name="btc_dominance_title">BTC Dominans Grafiği</string>
+    <string name="btc_dominance_desc">Bitcoin\'in toplam kripto piyasasındaki hakimiyet oranı</string>
+    <string name="fear_greed_history">Korku &amp; Açgözlülük Geçmişi</string>
+    <string name="last_30_days">Son 30 Gün</string>
+    <string name="fear_greed_date">Tarih</string>
+    <string name="fear_greed_level">Seviye</string>
     <string name="web3_subtitle">Cüzdan, DeFi, NFT</string>
     <string name="community_subtitle">Akış, Sinyaller, Liderler</string>
     <string name="airdrop_subtitle">Güncel Fırsatlar</string>
@@ -248,7 +266,7 @@
     <string name="active_alerts">Uyarılar</string>
     <string name="quick_settings">Hızlı Ayarlar</string>
     <string name="settings_desc">Tema, dil, bildirimler</string>
-    <string name="app_version_display">Sürüm 7.5.2</string>
+    <string name="app_version_display">Sürüm 8.2.2</string>
 
     <!-- v6.0 - Staking -->
     <string name="staking">Staking</string>
@@ -286,5 +304,10 @@
     <string name="greeting_evening">İyi akşamlar</string>
     <string name="greeting_night">İyi geceler</string>
     <string name="shared_via_coinlab">CoinLab ile paylaşıldı 🧪</string>
-    <string name="app_version">v7.5.2</string>
+    <string name="app_version">v8.2.2</string>
+
+    <!-- v8.2.2 - Community Reform -->
+    <string name="channel_community">Topluluk Bildirimleri</string>
+    <string name="channel_community_desc">Topluluk gönderileri, yorumlar ve etkileşimler</string>
+    <string name="community_posts">Gönderiler</string>
 </resources>

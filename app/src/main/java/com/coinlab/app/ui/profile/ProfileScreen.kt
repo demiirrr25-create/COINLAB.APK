@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -301,6 +302,13 @@ fun ProfileScreen(
                     value = "${uiState.activeAlertsCount}",
                     icon = Icons.Filled.Notifications,
                     color = CoinLabPurple,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    title = stringResource(R.string.community_posts),
+                    value = "${uiState.communityPostCount}",
+                    icon = Icons.Filled.Forum,
+                    color = CoinLabGold,
                     modifier = Modifier.weight(1f)
                 )
             }

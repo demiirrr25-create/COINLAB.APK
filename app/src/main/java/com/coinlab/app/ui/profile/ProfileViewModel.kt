@@ -6,6 +6,8 @@ import com.coinlab.app.data.local.dao.PortfolioDao
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.local.dao.WatchlistDao
 import com.coinlab.app.data.preferences.UserPreferences
+import com.coinlab.app.data.remote.firebase.CommunityFirestoreRepository
+import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +20,7 @@ data class ProfileUiState(
     val portfolioCoinCount: Int = 0,
     val watchlistCount: Int = 0,
     val activeAlertsCount: Int = 0,
+    val communityPostCount: Int = 0,
     val displayName: String = "",
     val avatarEmoji: String = "",
     val isEditing: Boolean = false,
@@ -30,7 +33,9 @@ class ProfileViewModel @Inject constructor(
     private val portfolioDao: PortfolioDao,
     private val watchlistDao: WatchlistDao,
     private val priceAlertDao: PriceAlertDao,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val communityRepo: CommunityFirestoreRepository,
+    private val authManager: FirebaseAuthManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -78,6 +83,15 @@ class ProfileViewModel @Inject constructor(
             try {
                 val activeAlerts = priceAlertDao.getActiveAlerts()
                 _uiState.update { it.copy(activeAlertsCount = activeAlerts.size) }
+            } catch (_: Exception) { }
+        }
+
+        viewModelScope.launch {
+            try {
+                authManager.ensureAuthenticated()
+                val userId = authManager.getCurrentUserId()
+                val postCount = communityRepo.getUserPostCount(userId)
+                _uiState.update { it.copy(communityPostCount = postCount) }
             } catch (_: Exception) { }
         }
     }

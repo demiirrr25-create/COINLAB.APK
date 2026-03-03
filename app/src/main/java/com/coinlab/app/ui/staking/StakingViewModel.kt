@@ -2,7 +2,7 @@ package com.coinlab.app.ui.staking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -45,7 +45,8 @@ enum class StakingSortBy {
 
 @HiltViewModel
 class StakingViewModel @Inject constructor(
-    private val tickerCache: BinanceTickerCache
+    private val tickerCache: BinanceTickerCache,
+    private val coinRegistry: DynamicCoinRegistry
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StakingUiState())
@@ -139,8 +140,8 @@ class StakingViewModel @Inject constructor(
                 val tickerMap = tickerCache.getTickerMap()
 
                 val stakingCoins = stakingRates.map { (coinId, exchangeRates) ->
-                    val meta = BinanceCoinMapper.getMetaByCoinId(coinId)
-                    val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId)
+                    val meta = coinRegistry.getMetaByCoinId(coinId)
+                    val binanceSymbol = coinRegistry.getBinanceSymbolByCoinId(coinId)
                     val ticker = binanceSymbol?.let { tickerMap[it] }
                     val price = ticker?.lastPrice?.toDoubleOrNull() ?: 0.0
 
@@ -150,7 +151,7 @@ class StakingViewModel @Inject constructor(
                         symbol = (meta?.symbol ?: coinId).uppercase(),
                         image = meta?.image ?: "",
                         currentPrice = price,
-                        marketCapRank = BinanceCoinMapper.getMarketCapRank(coinId),
+                        marketCapRank = coinRegistry.getMarketCapRank(coinId),
                         exchanges = exchangeRates.map { (exchange, rates) ->
                             ExchangeStaking(
                                 exchange = exchange,

@@ -125,6 +125,18 @@
     <string name="empty_watchlist">Watchlist is empty</string>
     <string name="coin">Coin</string>
 
+    <!-- Coin Categories -->
+    <string name="cat_layer1">Layer 1</string>
+    <string name="cat_layer2">Layer 2</string>
+    <string name="cat_defi">DeFi</string>
+    <string name="cat_meme">Meme</string>
+    <string name="cat_nft_gaming">NFT/Gaming</string>
+    <string name="cat_ai">AI</string>
+    <string name="cat_infra">Infrastructure</string>
+    <string name="cat_exchange">Exchange</string>
+    <string name="cat_privacy">Privacy</string>
+    <string name="cat_stable_defi">Stable DeFi</string>
+
     <!-- Missing Detail -->
     <string name="set_alert">Set Alert</string>
     <string name="ath_change">ATH Change</string>

@@ -2,13 +2,15 @@ package com.coinlab.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
+import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.data.remote.api.FearGreedApi
 import com.coinlab.app.data.remote.websocket.SharedWebSocketManager
 import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.repository.CoinRepository
 import com.coinlab.app.data.preferences.AuthPreferences
+import com.coinlab.app.data.remote.api.FearGreedDataItem
 import com.coinlab.app.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -28,6 +30,7 @@ data class HomeUiState(
     val top5Coins: List<Coin> = emptyList(),
     val fearGreedValue: Int = 0,
     val fearGreedLabel: String = "",
+    val fearGreedHistory: List<FearGreedDataItem> = emptyList(),
     val totalMarketCap: Double = 0.0,
     val totalVolume24h: Double = 0.0,
     val btcDominance: Double = 0.0,
@@ -47,9 +50,11 @@ class HomeViewModel @Inject constructor(
     private val coinRepository: CoinRepository,
     private val tickerCache: BinanceTickerCache,
     private val fearGreedApi: FearGreedApi,
+    private val coinGeckoApi: CoinGeckoApi,
     private val userPreferences: UserPreferences,
     private val sharedWebSocketManager: SharedWebSocketManager,
-    private val authPreferences: AuthPreferences
+    private val authPreferences: AuthPreferences,
+    private val coinRegistry: DynamicCoinRegistry
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -152,19 +157,47 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun loadGlobalData() {
         try {
-            // Use centralized ticker cache (shared across all ViewModels, ~50 tickers only)
-            val tickers = tickerCache.getTickers()
+            // Primary: CoinGecko /global endpoint for accurate market data
+            val globalData = coinGeckoApi.getGlobalData()
+            val data = globalData.data
+            if (data != null) {
+                val totalMcap = data.total_market_cap?.get("usd") ?: 0.0
+                val totalVol = data.total_volume?.get("usd") ?: 0.0
+                val btcDom = data.market_cap_percentage?.get("btc") ?: 0.0
+                val ethDom = data.market_cap_percentage?.get("eth") ?: 0.0
+                val mcapChange = data.market_cap_change_percentage_24h_usd ?: 0.0
+                val activeCryptos = data.active_cryptocurrencies ?: 0
 
+                _uiState.update {
+                    it.copy(
+                        totalMarketCap = totalMcap,
+                        totalVolume24h = totalVol,
+                        btcDominance = btcDom,
+                        ethDominance = ethDom,
+                        marketCapChangePercent24h = mcapChange,
+                        activeCryptos = activeCryptos
+                    )
+                }
+                return
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            android.util.Log.w("HomeVM", "CoinGecko global failed, falling back to Binance")
+        }
+
+        // Fallback: Calculate from Binance tickers
+        try {
+            val tickers = tickerCache.getTickers()
             var totalMarketCap = 0.0
             var totalVolume = 0.0
             var btcMarketCap = 0.0
             var ethMarketCap = 0.0
 
             for (ticker in tickers) {
-                val meta = BinanceCoinMapper.getMetaByBinanceSymbol(ticker.symbol ?: continue) ?: continue
+                val meta = coinRegistry.getMetaByBinanceSymbol(ticker.symbol ?: continue) ?: continue
                 val price = ticker.lastPrice?.toDoubleOrNull() ?: continue
                 val volume = ticker.quoteVolume?.toDoubleOrNull() ?: 0.0
-                val supply = getApproxSupply(meta.id)
+                val supply = coinRegistry.getCirculatingSupply(meta.id)
                 val mcap = price * supply
                 totalMarketCap += mcap
                 totalVolume += volume
@@ -188,26 +221,6 @@ class HomeViewModel @Inject constructor(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
         }
-    }
-
-    private fun getApproxSupply(coinId: String): Double = when (coinId) {
-        "bitcoin" -> 19_800_000.0
-        "ethereum" -> 120_500_000.0
-        "binancecoin" -> 145_000_000.0
-        "solana" -> 470_000_000.0
-        "ripple" -> 57_000_000_000.0
-        "cardano" -> 36_000_000_000.0
-        "dogecoin" -> 147_000_000_000.0
-        "tron" -> 86_000_000_000.0
-        "polygon-ecosystem-token" -> 10_000_000_000.0
-        "polkadot" -> 1_500_000_000.0
-        "avalanche-2" -> 410_000_000.0
-        "chainlink" -> 630_000_000.0
-        "shiba-inu" -> 589_000_000_000_000.0
-        "litecoin" -> 75_000_000.0
-        "near" -> 1_200_000_000.0
-        "stellar" -> 30_000_000_000.0
-        else -> 1_000_000_000.0
     }
 
     private fun connectWebSocket() {
@@ -248,13 +261,25 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun loadFearGreedIndex() {
         try {
-            val response = fearGreedApi.getFearGreedIndex()
-            val data = response.data?.firstOrNull()
-            if (data != null) {
+            // Load current value and 30-day history in parallel
+            coroutineScope {
+                val currentDeferred = async {
+                    try { fearGreedApi.getFearGreedIndex() } catch (_: Exception) { null }
+                }
+                val historyDeferred = async {
+                    try { fearGreedApi.getFearGreedHistory(limit = 30) } catch (_: Exception) { null }
+                }
+                val currentResponse = currentDeferred.await()
+                val historyResponse = historyDeferred.await()
+
+                val currentData = currentResponse?.data?.firstOrNull()
+                val historyData = historyResponse?.data ?: emptyList()
+
                 _uiState.update {
                     it.copy(
-                        fearGreedValue = data.value?.toIntOrNull() ?: 0,
-                        fearGreedLabel = data.value_classification ?: ""
+                        fearGreedValue = currentData?.value?.toIntOrNull() ?: it.fearGreedValue,
+                        fearGreedLabel = currentData?.value_classification ?: it.fearGreedLabel,
+                        fearGreedHistory = historyData
                     )
                 }
             }

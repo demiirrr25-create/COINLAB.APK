@@ -1,9 +1,16 @@
 package com.coinlab.app.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "coins")
+@Entity(
+    tableName = "coins",
+    indices = [
+        Index(value = ["symbol"]),
+        Index(value = ["marketCapRank"])
+    ]
+)
 data class CoinEntity(
     @PrimaryKey val id: String,
     val symbol: String,

@@ -1,16 +1,18 @@
 package com.coinlab.app.ui.auth
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,14 +23,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.coinlab.app.R
 import com.coinlab.app.ui.theme.*
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+
+private fun Context.findActivity(): Activity {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    throw IllegalStateException("No Activity found in context")
+}
+
+private const val WEB_CLIENT_ID = "484421142982-7clmnm7k38bqrjihi475dlu97ud97k1r.apps.googleusercontent.com"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +61,8 @@ fun LoginScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Logo animation
     val infiniteTransition = rememberInfiniteTransition(label = "logo")
@@ -58,6 +82,63 @@ fun LoginScreen(
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) {
             onLoginSuccess()
+        }
+    }
+
+    // Google Sign-In launcher
+    fun launchGoogleSignIn() {
+        coroutineScope.launch {
+            try {
+                val activity = context.findActivity()
+                val credentialManager = CredentialManager.create(activity)
+
+                val signInOption = GetSignInWithGoogleOption.Builder(WEB_CLIENT_ID)
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInOption)
+                    .build()
+
+                val result = credentialManager.getCredential(activity, request)
+                val credential = result.credential
+
+                // GetSignInWithGoogleOption returns CustomCredential
+                // Try to extract GoogleIdTokenCredential from any credential type
+                val googleCredential = try {
+                    GoogleIdTokenCredential.createFrom(credential.data)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    android.util.Log.e("LoginScreen", "Failed to parse credential type=${credential.type}", e)
+                    viewModel.onGoogleSignInError("Google kimlik bilgisi okunamadı: ${e.message}")
+                    return@launch
+                }
+
+                val idToken = googleCredential.idToken
+                val email = googleCredential.id
+                val displayName = googleCredential.displayName ?: ""
+                val photoUrl = googleCredential.profilePictureUri?.toString() ?: ""
+
+                viewModel.signInWithGoogle(
+                    idToken = idToken,
+                    googleEmail = email,
+                    googleDisplayName = displayName,
+                    googlePhotoUrl = photoUrl
+                )
+
+            } catch (e: GetCredentialCancellationException) {
+                // User cancelled — do nothing
+            } catch (e: NoCredentialException) {
+                viewModel.onGoogleSignInError(
+                    "Bu cihazda Google hesabı bulunamadı. Lütfen önce Ayarlar'dan bir Google hesabı ekleyin."
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("LoginScreen", "Google sign-in error", e)
+                viewModel.onGoogleSignInError(
+                    "Google girişi başarısız: ${e.localizedMessage ?: "Bilinmeyen hata"}"
+                )
+            }
         }
     }
 
@@ -99,8 +180,8 @@ fun LoginScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(com.coinlab.app.R.drawable.ic_launcher_foreground),
+                        Image(
+                            painter = painterResource(R.drawable.ic_launcher_foreground),
                             contentDescription = "CoinLab",
                             modifier = Modifier.size(90.dp)
                         )
@@ -127,7 +208,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // GitHub Login Form
+            // Google Sign-In Form
             AnimatedVisibility(
                 visible = contentVisible,
                 enter = fadeIn(tween(800, delayMillis = 300)) + slideInVertically(tween(800, delayMillis = 300)) { 50 }
@@ -143,17 +224,16 @@ fun LoginScreen(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // GitHub icon indicator
-                        Icon(
-                            Icons.Default.Code,
+                        // Google icon
+                        Image(
+                            painter = painterResource(R.drawable.ic_google),
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(40.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = "GitHub ile Giriş Yap",
+                            text = "Hoş Geldiniz",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -162,42 +242,12 @@ fun LoginScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "GitHub kullanıcı adınızla devam edin",
+                            text = "Google hesabınızla giriş yapın",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.5f)
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
-
-                        // GitHub Username field
-                        OutlinedTextField(
-                            value = uiState.githubUsername,
-                            onValueChange = viewModel::onGitHubUsernameChange,
-                            label = { Text("GitHub Kullanıcı Adı") },
-                            leadingIcon = { Icon(Icons.Default.AlternateEmail, contentDescription = null) },
-                            placeholder = { Text("örn: octocat") },
-                            isError = uiState.usernameError != null,
-                            supportingText = uiState.usernameError?.let { { Text(it) } },
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    focusManager.clearFocus()
-                                    viewModel.loginWithGitHub()
-                                }
-                            ),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = CoinLabGreen,
-                                focusedLabelColor = CoinLabGreen,
-                                cursorColor = CoinLabGreen
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
 
                         // Remember Me checkbox
                         Row(
@@ -261,32 +311,40 @@ fun LoginScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Login button
+                        // Google Sign-In button
                         Button(
-                            onClick = viewModel::loginWithGitHub,
+                            onClick = { launchGoogleSignIn() },
                             enabled = !uiState.isLoading,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF24292E),
-                                contentColor = Color.White
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF1F1F1F)
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 2.dp,
+                                pressedElevation = 4.dp
+                            )
                         ) {
                             if (uiState.isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    color = Color.White,
+                                    color = Color(0xFF1F1F1F),
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Icon(Icons.Default.Code, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Image(
+                                    painter = painterResource(R.drawable.ic_google),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "GitHub ile Devam Et",
+                                    text = "Google ile Giriş Yap",
                                     fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -294,28 +352,33 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Skip login
+            // Register link
             AnimatedVisibility(
                 visible = contentVisible,
                 enter = fadeIn(tween(800, delayMillis = 600))
             ) {
-                TextButton(onClick = onLoginSuccess) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Giriş yapmadan devam et",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.4f)
+                        text = "Hesabın yok mu? ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.6f)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.White.copy(alpha = 0.4f)
+                    Text(
+                        text = "Kayıt Ol",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = CoinLabGreen,
+                        modifier = Modifier.clickable { onNavigateToRegister() }
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

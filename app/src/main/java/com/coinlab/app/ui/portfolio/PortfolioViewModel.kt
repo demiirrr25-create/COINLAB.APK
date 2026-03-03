@@ -3,7 +3,7 @@ package com.coinlab.app.ui.portfolio
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.BinanceCoinMapper
+import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
 import com.coinlab.app.domain.model.PortfolioEntry
 import com.coinlab.app.domain.model.TransactionType
@@ -50,7 +50,8 @@ data class PortfolioHolding(
 class PortfolioViewModel @Inject constructor(
     private val portfolioRepository: PortfolioRepository,
     private val tickerCache: BinanceTickerCache,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val coinRegistry: DynamicCoinRegistry
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PortfolioUiState())
@@ -114,7 +115,7 @@ class PortfolioViewModel @Inject constructor(
                     buyEntries.sumOf { it.amount * it.buyPrice } / totalBought
                 } else 0.0
 
-                val binanceSymbol = BinanceCoinMapper.getBinanceSymbolByCoinId(coinId)
+                val binanceSymbol = coinRegistry.getBinanceSymbolByCoinId(coinId)
                 val currentPrice = binanceSymbol?.let { tickerMap[it]?.lastPrice?.toDoubleOrNull() } ?: 0.0
                 val holdingValue = netAmount * currentPrice
                 val holdingCost = netAmount * avgBuyPrice

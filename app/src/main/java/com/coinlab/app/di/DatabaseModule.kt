@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.coinlab.app.data.local.CoinLabDatabase
 import com.coinlab.app.data.local.dao.CoinDao
+import com.coinlab.app.data.local.dao.CoinMetadataDao
 import com.coinlab.app.data.local.dao.PortfolioDao
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.local.dao.WatchlistDao
@@ -32,6 +33,9 @@ object DatabaseModule {
 
     @Provides
     fun provideCoinDao(database: CoinLabDatabase): CoinDao = database.coinDao()
+
+    @Provides
+    fun provideCoinMetadataDao(database: CoinLabDatabase): CoinMetadataDao = database.coinMetadataDao()
 
     @Provides
     fun providePortfolioDao(database: CoinLabDatabase): PortfolioDao = database.portfolioDao()
