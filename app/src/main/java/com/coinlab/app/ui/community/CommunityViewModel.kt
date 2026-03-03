@@ -6,10 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.api.BinanceApi
-import com.coinlab.app.data.remote.firebase.CommunityFirestoreRepository
+import com.coinlab.app.data.remote.firebase.CommunityRealtimeRepository
 import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
-import com.coinlab.app.data.remote.firebase.model.FirestoreComment
-import com.coinlab.app.data.remote.firebase.model.FirestorePost
+import com.coinlab.app.data.remote.firebase.model.RealtimeComment
+import com.coinlab.app.data.remote.firebase.model.RealtimePost
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -150,7 +150,7 @@ class CommunityViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val binanceApi: BinanceApi,
     private val coinRegistry: DynamicCoinRegistry,
-    private val communityRepo: CommunityFirestoreRepository,
+    private val communityRepo: CommunityRealtimeRepository,
     private val authManager: FirebaseAuthManager
 ) : ViewModel() {
 
@@ -218,45 +218,37 @@ class CommunityViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-                communityRepo.getPosts().collect { firestorePosts ->
+                communityRepo.getPosts().collect { realtimePosts ->
                     val userId = _uiState.value.currentUserId
-                    android.util.Log.d("CommunityVM", "Received ${firestorePosts.size} posts from Firestore, userId=$userId")
-                    val posts = firestorePosts.map { fp ->
+                    android.util.Log.d("CommunityVM", "Received ${realtimePosts.size} posts from Realtime DB, userId=$userId")
+                    val posts = realtimePosts.map { rp ->
                         FeedPost(
-                            id = fp.id,
-                            authorId = fp.authorId,
-                            author = fp.authorName,
-                            authorAvatar = fp.authorAvatar.ifEmpty { null },
-                            authorBadge = fp.authorBadge.ifEmpty { null },
-                            content = fp.content,
-                            coinTag = fp.coinTag.ifEmpty { null },
-                            sentiment = try { Sentiment.valueOf(fp.sentiment) } catch (_: Exception) { null },
-                            likes = fp.likes.size,
-                            comments = fp.commentCount,
-                            timestamp = fp.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
-                            isLiked = fp.likes.contains(userId),
-                            channelId = fp.channelId.ifEmpty { null },
-                            imageUrl = fp.imageUrl.ifEmpty { null },
-                            isEdited = fp.isEdited,
-                            mentions = fp.mentions,
-                            reportCount = fp.reportCount,
-                            isOwnPost = fp.authorId == userId
+                            id = rp.id,
+                            authorId = rp.authorId,
+                            author = rp.authorName,
+                            authorAvatar = rp.authorAvatar.ifEmpty { null },
+                            authorBadge = rp.authorBadge.ifEmpty { null },
+                            content = rp.content,
+                            coinTag = rp.coinTag.ifEmpty { null },
+                            sentiment = try { Sentiment.valueOf(rp.sentiment) } catch (_: Exception) { null },
+                            likes = rp.likes.size,
+                            comments = rp.commentCount,
+                            timestamp = if (rp.createdAt > 0) rp.createdAt else System.currentTimeMillis(),
+                            isLiked = rp.likes.containsKey(userId),
+                            channelId = rp.channelId.ifEmpty { null },
+                            imageUrl = rp.imageUrl.ifEmpty { null },
+                            isEdited = rp.isEdited,
+                            mentions = rp.mentions,
+                            reportCount = rp.reportCount,
+                            isOwnPost = rp.authorId == userId
                         )
                     }
                     _uiState.update { it.copy(feedPosts = posts, isLoading = false) }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                val errorCode = (e as? com.google.firebase.firestore.FirebaseFirestoreException)?.code
-                val userMessage = when (errorCode) {
-                    com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-                        "\u26a0\ufe0f Gönderiler yüklenemedi: Firebase güvenlik kuralları herkese okuma izni vermiyor. Firebase Console → Firestore → Rules bölümünden 'allow read: if true;' olarak güncelleyin."
-                    com.google.firebase.firestore.FirebaseFirestoreException.Code.FAILED_PRECONDITION ->
-                        "\u26a0\ufe0f Composite index eksik. Logcat'teki linke tıklayarak Firebase Console'dan index oluşturun."
-                    else -> "Gönderiler yüklenemedi: ${e.message}"
-                }
-                android.util.Log.e("CommunityVM", "loadPosts failed [$errorCode]", e)
-                _uiState.update { it.copy(isLoading = false, errorMessage = userMessage) }
+                android.util.Log.e("CommunityVM", "loadPosts failed", e)
+                _uiState.update { it.copy(isLoading = false, errorMessage = "Gönderiler yüklenemedi: ${e.message}") }
             }
         }
     }
@@ -281,7 +273,7 @@ class CommunityViewModel @Inject constructor(
 
                 val mentions = extractMentions(content)
 
-                val post = FirestorePost(
+                val post = RealtimePost(
                     authorId = state.currentUserId,
                     authorName = state.currentUserName,
                     authorAvatar = state.currentUserAvatar,
@@ -376,18 +368,18 @@ class CommunityViewModel @Inject constructor(
     private fun loadComments(postId: String) {
         viewModelScope.launch {
             try {
-                communityRepo.getComments(postId).collect { firestoreComments ->
+                communityRepo.getComments(postId).collect { realtimeComments ->
                     val userId = _uiState.value.currentUserId
-                    val comments = firestoreComments.map { fc ->
+                    val comments = realtimeComments.map { rc ->
                         CommentItem(
-                            id = fc.id,
-                            authorId = fc.authorId,
-                            authorName = fc.authorName,
-                            authorAvatar = fc.authorAvatar,
-                            content = fc.content,
-                            timestamp = fc.createdAt?.toDate()?.time ?: System.currentTimeMillis(),
-                            mentions = fc.mentions,
-                            isOwnComment = fc.authorId == userId
+                            id = rc.id,
+                            authorId = rc.authorId,
+                            authorName = rc.authorName,
+                            authorAvatar = rc.authorAvatar,
+                            content = rc.content,
+                            timestamp = if (rc.createdAt > 0) rc.createdAt else System.currentTimeMillis(),
+                            mentions = rc.mentions,
+                            isOwnComment = rc.authorId == userId
                         )
                     }
                     _uiState.update { state ->
@@ -405,7 +397,7 @@ class CommunityViewModel @Inject constructor(
                 val state = _uiState.value
                 val mentions = extractMentions(content)
 
-                val comment = FirestoreComment(
+                val comment = RealtimeComment(
                     authorId = state.currentUserId,
                     authorName = state.currentUserName,
                     authorAvatar = state.currentUserAvatar,
@@ -435,17 +427,17 @@ class CommunityViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 communityRepo.initializeDefaultChannels()
-                communityRepo.getChannels().collect { firestoreChannels ->
+                communityRepo.getChannels().collect { realtimeChannels ->
                     val userId = _uiState.value.currentUserId
-                    android.util.Log.d("CommunityVM", "Received ${firestoreChannels.size} channels")
-                    val channels = firestoreChannels.map { fc ->
+                    android.util.Log.d("CommunityVM", "Received ${realtimeChannels.size} channels")
+                    val channels = realtimeChannels.map { rc ->
                         CommunityChannel(
-                            id = fc.id,
-                            name = fc.name,
-                            description = fc.description,
-                            icon = fc.icon,
-                            memberCount = fc.memberCount,
-                            isJoined = fc.members.contains(userId)
+                            id = rc.id,
+                            name = rc.name,
+                            description = rc.description,
+                            icon = rc.icon,
+                            memberCount = rc.memberCount,
+                            isJoined = rc.members.containsKey(userId)
                         )
                     }
                     _uiState.update { it.copy(channels = channels) }

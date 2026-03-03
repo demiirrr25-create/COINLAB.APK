@@ -16,8 +16,8 @@ android {
         applicationId = "com.coinlab.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 41
-        versionName = "8.8"
+        versionCode = 42
+        versionName = "8.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -154,6 +154,7 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.storage)
 

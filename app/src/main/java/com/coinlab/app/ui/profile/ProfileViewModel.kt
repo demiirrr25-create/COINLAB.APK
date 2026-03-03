@@ -6,7 +6,7 @@ import com.coinlab.app.data.local.dao.PortfolioDao
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.local.dao.WatchlistDao
 import com.coinlab.app.data.preferences.UserPreferences
-import com.coinlab.app.data.remote.firebase.CommunityFirestoreRepository
+import com.coinlab.app.data.remote.firebase.CommunityRealtimeRepository
 import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +34,7 @@ class ProfileViewModel @Inject constructor(
     private val watchlistDao: WatchlistDao,
     private val priceAlertDao: PriceAlertDao,
     private val userPreferences: UserPreferences,
-    private val communityRepo: CommunityFirestoreRepository,
+    private val communityRepo: CommunityRealtimeRepository,
     private val authManager: FirebaseAuthManager
 ) : ViewModel() {
 

@@ -104,6 +104,7 @@ browser = { group = "androidx.browser", name = "browser", version.ref = "browser
 # Firebase
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
+firebase-database = { group = "com.google.firebase", name = "firebase-database-ktx" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage-ktx" }
 
