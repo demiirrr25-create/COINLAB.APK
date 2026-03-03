@@ -88,6 +88,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -97,6 +99,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -137,8 +140,21 @@ fun CommunityScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabs = CommunityTab.entries
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // v8.8 — Show success message when post is created
+    LaunchedEffect(uiState.postSuccess) {
+        if (uiState.postSuccess) {
+            snackbarHostState.showSnackbar(
+                message = "\u2705 Payla\u015f\u0131m\u0131n\u0131z ba\u015far\u0131yla payla\u015f\u0131ld\u0131! T\u00fcm kullan\u0131c\u0131lar g\u00f6rebilir.",
+                withDismissAction = true
+            )
+            viewModel.clearPostSuccess()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {

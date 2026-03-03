@@ -49,7 +49,9 @@ data class CommunityUiState(
     val mentionSuggestions: List<Pair<String, String>> = emptyList(),
     val selectedImageUri: Uri? = null,
     val isUploading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // v8.8 — Post success state
+    val postSuccess: Boolean = false
 )
 
 enum class CommunityTab(val title: String) {
@@ -245,8 +247,16 @@ class CommunityViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                android.util.Log.e("CommunityVM", "loadPosts failed", e)
-                _uiState.update { it.copy(isLoading = false, errorMessage = "Gönderiler yüklenemedi: ${e.message}. Firestore kurallarını ve composite index'leri kontrol edin.") }
+                val errorCode = (e as? com.google.firebase.firestore.FirebaseFirestoreException)?.code
+                val userMessage = when (errorCode) {
+                    com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                        "\u26a0\ufe0f Gönderiler yüklenemedi: Firebase güvenlik kuralları herkese okuma izni vermiyor. Firebase Console → Firestore → Rules bölümünden 'allow read: if true;' olarak güncelleyin."
+                    com.google.firebase.firestore.FirebaseFirestoreException.Code.FAILED_PRECONDITION ->
+                        "\u26a0\ufe0f Composite index eksik. Logcat'teki linke tıklayarak Firebase Console'dan index oluşturun."
+                    else -> "Gönderiler yüklenemedi: ${e.message}"
+                }
+                android.util.Log.e("CommunityVM", "loadPosts failed [$errorCode]", e)
+                _uiState.update { it.copy(isLoading = false, errorMessage = userMessage) }
             }
         }
     }
@@ -284,11 +294,13 @@ class CommunityViewModel @Inject constructor(
                 )
 
                 communityRepo.createPost(post, imageUri)
+                android.util.Log.d("CommunityVM", "Post created successfully")
                 _uiState.update {
                     it.copy(
                         showCreatePost = false,
                         selectedImageUri = null,
-                        isUploading = false
+                        isUploading = false,
+                        postSuccess = true
                     )
                 }
             } catch (e: Exception) {
@@ -525,6 +537,10 @@ class CommunityViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun clearPostSuccess() {
+        _uiState.update { it.copy(postSuccess = false) }
     }
 
     // ─── SIGNALS (API) ──────────────────────────

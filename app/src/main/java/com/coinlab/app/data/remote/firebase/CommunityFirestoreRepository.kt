@@ -58,7 +58,16 @@ class CommunityFirestoreRepository @Inject constructor(
 
         val listener: ListenerRegistration = query.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                android.util.Log.e("CommunityRepo", "Posts listener error: ${error.message}", error)
+                val errorCode = (error as? FirebaseFirestoreException)?.code
+                android.util.Log.e("CommunityRepo", "Posts listener error [$errorCode]: ${error.message}", error)
+                // For PERMISSION_DENIED and FAILED_PRECONDITION, don't close - these are config issues
+                // The user needs to fix Firebase rules/indexes
+                if (errorCode == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                    android.util.Log.e("CommunityRepo", "PERMISSION_DENIED: Firebase güvenlik kuralları yanlış! Kuralları kontrol edin.")
+                }
+                if (errorCode == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
+                    android.util.Log.e("CommunityRepo", "FAILED_PRECONDITION: Composite index eksik! Firebase Console'dan index oluşturun.")
+                }
                 close(error)
                 return@addSnapshotListener
             }
@@ -70,16 +79,18 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(3) { cause ->
-        val isRetryable = cause is FirebaseFirestoreException &&
-            cause.code in listOf(
-                FirebaseFirestoreException.Code.UNAVAILABLE,
-                FirebaseFirestoreException.Code.ABORTED,
-                FirebaseFirestoreException.Code.INTERNAL
-            )
+    }.retry(Long.MAX_VALUE) { cause ->
+        val code = (cause as? FirebaseFirestoreException)?.code
+        val isRetryable = cause is FirebaseFirestoreException && code in listOf(
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+            FirebaseFirestoreException.Code.ABORTED,
+            FirebaseFirestoreException.Code.INTERNAL,
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+        )
         if (isRetryable) {
-            android.util.Log.w("CommunityRepo", "Posts listener retrying after: ${cause.message}")
-            delay(2000)
+            android.util.Log.w("CommunityRepo", "Posts listener retrying [$code] after: ${cause.message}")
+            delay(3000)
         }
         isRetryable
     }
@@ -105,14 +116,16 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(3) { cause ->
-        val isRetryable = cause is FirebaseFirestoreException &&
-            cause.code in listOf(
-                FirebaseFirestoreException.Code.UNAVAILABLE,
-                FirebaseFirestoreException.Code.ABORTED,
-                FirebaseFirestoreException.Code.INTERNAL
-            )
-        if (isRetryable) delay(2000)
+    }.retry(Long.MAX_VALUE) { cause ->
+        val code = (cause as? FirebaseFirestoreException)?.code
+        val isRetryable = cause is FirebaseFirestoreException && code in listOf(
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+            FirebaseFirestoreException.Code.ABORTED,
+            FirebaseFirestoreException.Code.INTERNAL,
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+        )
+        if (isRetryable) delay(3000)
         isRetryable
     }
 
@@ -126,12 +139,14 @@ class CommunityFirestoreRepository @Inject constructor(
             val finalPost = post.copy(
                 id = docRef.id,
                 imageUrl = imageUrl,
-                createdAt = null // Let @ServerTimestamp fill this on the server
+                createdAt = Timestamp.now() // Use client timestamp for immediate visibility
             )
             docRef.set(finalPost).await()
+            android.util.Log.d("CommunityRepo", "Post created successfully: id=${docRef.id}, author=${post.authorName}")
             return docRef.id
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            android.util.Log.e("CommunityRepo", "createPost FAILED: ${e.message}", e)
             throw e
         }
     }
@@ -235,14 +250,16 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(3) { cause ->
-        val isRetryable = cause is FirebaseFirestoreException &&
-            cause.code in listOf(
-                FirebaseFirestoreException.Code.UNAVAILABLE,
-                FirebaseFirestoreException.Code.ABORTED,
-                FirebaseFirestoreException.Code.INTERNAL
-            )
-        if (isRetryable) delay(2000)
+    }.retry(Long.MAX_VALUE) { cause ->
+        val code = (cause as? FirebaseFirestoreException)?.code
+        val isRetryable = cause is FirebaseFirestoreException && code in listOf(
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+            FirebaseFirestoreException.Code.ABORTED,
+            FirebaseFirestoreException.Code.INTERNAL,
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+        )
+        if (isRetryable) delay(3000)
         isRetryable
     }
 
@@ -253,7 +270,7 @@ class CommunityFirestoreRepository @Inject constructor(
         try {
             val commentsRef = postsCollection.document(postId).collection("comments")
             val docRef = commentsRef.document()
-            val finalComment = comment.copy(id = docRef.id, createdAt = null) // Let @ServerTimestamp fill on server
+            val finalComment = comment.copy(id = docRef.id, createdAt = Timestamp.now()) // Client timestamp for immediate visibility
             docRef.set(finalComment).await()
 
             // Increment comment count on parent post
@@ -301,14 +318,16 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(3) { cause ->
-        val isRetryable = cause is FirebaseFirestoreException &&
-            cause.code in listOf(
-                FirebaseFirestoreException.Code.UNAVAILABLE,
-                FirebaseFirestoreException.Code.ABORTED,
-                FirebaseFirestoreException.Code.INTERNAL
-            )
-        if (isRetryable) delay(2000)
+    }.retry(Long.MAX_VALUE) { cause ->
+        val code = (cause as? FirebaseFirestoreException)?.code
+        val isRetryable = cause is FirebaseFirestoreException && code in listOf(
+            FirebaseFirestoreException.Code.UNAVAILABLE,
+            FirebaseFirestoreException.Code.ABORTED,
+            FirebaseFirestoreException.Code.INTERNAL,
+            FirebaseFirestoreException.Code.PERMISSION_DENIED,
+            FirebaseFirestoreException.Code.FAILED_PRECONDITION
+        )
+        if (isRetryable) delay(3000)
         isRetryable
     }
 
