@@ -1,70 +1,51 @@
 package com.coinlab.app.data.remote.firebase
 
 import android.util.Log
-import com.coinlab.app.data.remote.api.*
+import com.coinlab.app.data.remote.api.BinanceFuturesApi
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
-import kotlin.math.exp
 
 /**
- * v12.1 — Professional Liquidation Repository
+ * v12.2 — CoinGlass-Grade Liquidation Repository
  *
- * Multi-exchange weighted aggregation with Coinglass-grade density model.
+ * Hybrid architecture:
+ *   - Firebase Cloud Functions compute heatmap data (backend)
+ *   - Firebase RTDB provides real-time data stream to mobile
+ *   - Binance REST API for kline chart data (direct)
+ *   - Firebase Auth for user preferences
  *
- * Weight model:
- *   Binance  35%
- *   Bybit    25%
- *   OKX      20%
- *   Bitget   10%
- *   Gate.io  10%
- *
- * Density formula:
- *   LiqDensity = (OI * LeverageCluster * VolatilityFactor) / PriceDistance
+ * RTDB paths:
+ *   /heatmap/{symbol}/{timeframe}  — pre-computed heatmap data
+ *   /users/{uid}/heatmapSettings   — user preferences
  */
 @Singleton
 class LiquidationRepository @Inject constructor(
-    private val binanceFutures: BinanceFuturesApi,
-    private val bybitApi: BybitApi,
-    private val okxApi: OkxApi,
-    private val bitgetApi: BitgetApi,
-    private val gateioApi: GateioApi
+    private val binanceFutures: BinanceFuturesApi
 ) {
     companion object {
         private const val TAG = "LiquidationRepo"
-
-        private val EXCHANGE_WEIGHTS = mapOf(
-            "Binance" to 0.35,
-            "Bybit" to 0.25,
-            "OKX" to 0.20,
-            "Bitget" to 0.10,
-            "Gate.io" to 0.10
-        )
-
-        private val LEVERAGE_TIERS = listOf(
-            LeverageTier(2.0, 0.05),
-            LeverageTier(3.0, 0.08),
-            LeverageTier(5.0, 0.15),
-            LeverageTier(10.0, 0.25),
-            LeverageTier(20.0, 0.20),
-            LeverageTier(25.0, 0.10),
-            LeverageTier(50.0, 0.10),
-            LeverageTier(75.0, 0.04),
-            LeverageTier(100.0, 0.02),
-            LeverageTier(125.0, 0.01)
-        )
     }
 
-    private fun binanceSymbol(base: String) = "${base}USDT"
-    private fun bybitSymbol(base: String) = "${base}USDT"
-    private fun okxSymbol(base: String) = "${base}-USDT-SWAP"
-    private fun bitgetSymbol(base: String) = "${base}USDT"
-    private fun gateioSymbol(base: String) = "${base}_USDT"
+    private val database: FirebaseDatabase by lazy {
+        FirebaseDatabase.getInstance("https://com-coinlab-app-default-rtdb.europe-west1.firebasedatabase.app")
+    }
+    private val functions: FirebaseFunctions by lazy {
+        FirebaseFunctions.getInstance("europe-west1")
+    }
+    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
-    // ─── Candlestick Data ───────────────────────────────────────────
+    // ─── Kline Data (Direct Binance REST — low latency for chart) ────
 
     suspend fun getKlineData(
         baseCoin: String,
@@ -73,7 +54,7 @@ class LiquidationRepository @Inject constructor(
     ): List<CandleData> {
         return try {
             val raw = binanceFutures.getKlines(
-                symbol = binanceSymbol(baseCoin),
+                symbol = "${baseCoin}USDT",
                 interval = interval,
                 limit = limit
             )
@@ -95,97 +76,122 @@ class LiquidationRepository @Inject constructor(
         }
     }
 
-    // ─── Aggregated Liquidation Data ─────────────────────────────────
+    // ─── Firebase RTDB Real-Time Heatmap Stream ──────────────────────
 
-    suspend fun getAggregatedData(baseCoin: String): AggregatedLiquidationData {
-        return supervisorScope {
-            val binanceDeferred = async { fetchBinanceData(baseCoin) }
-            val bybitDeferred = async { fetchBybitData(baseCoin) }
-            val okxDeferred = async { fetchOkxData(baseCoin) }
-            val bitgetDeferred = async { fetchBitgetData(baseCoin) }
-            val gateioDeferred = async { fetchGateioData(baseCoin) }
-
-            val binance = binanceDeferred.await()
-            val bybit = bybitDeferred.await()
-            val okx = okxDeferred.await()
-            val bitget = bitgetDeferred.await()
-            val gateio = gateioDeferred.await()
-
-            val exchanges = listOfNotNull(binance, bybit, okx, bitget, gateio)
-            if (exchanges.isEmpty()) {
-                return@supervisorScope AggregatedLiquidationData(baseCoin = baseCoin)
+    fun observeHeatmapData(
+        symbol: String,
+        timeframe: String
+    ): Flow<AggregatedLiquidationData> = callbackFlow {
+        val ref = database.getReference("heatmap/${symbol.uppercase()}/${timeframe.uppercase()}")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val data = parseHeatmapSnapshot(snapshot, symbol)
+                    trySend(data)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Parse RTDB error", e)
+                }
             }
 
-            val totalOI = exchanges.sumOf { it.openInterestUsd }
-            val weightedFunding = exchanges.sumOf { ex ->
-                val weight = EXCHANGE_WEIGHTS[ex.exchange] ?: 0.1
-                ex.fundingRate * weight
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(TAG, "RTDB cancelled: ${error.message}")
+                close(error.toException())
             }
-            val weightedLong = if (totalOI > 0) {
-                exchanges.sumOf { it.longRatio * it.openInterestUsd } / totalOI
-            } else 0.5
-
-            val allLiquidations = exchanges.flatMap { it.recentLiquidations }
-                .sortedByDescending { it.timestamp }
-
-            val markPrice = exchanges.firstOrNull { it.exchange == "Binance" && it.markPrice > 0 }?.markPrice
-                ?: exchanges.firstOrNull { it.markPrice > 0 }?.markPrice ?: 0.0
-
-            val orderbookDepth = try { fetchOrderbookDepth(baseCoin) } catch (_: Exception) { emptyList() }
-
-            val heatmapBuckets = buildProfessionalHeatmap(
-                exchangeDataList = exchanges,
-                liquidations = allLiquidations,
-                markPrice = markPrice,
-                baseCoin = baseCoin,
-                orderbookDepth = orderbookDepth
-            )
-
-            AggregatedLiquidationData(
-                baseCoin = baseCoin,
-                markPrice = markPrice,
-                totalOpenInterestUsd = totalOI,
-                aggregatedFundingRate = weightedFunding,
-                longRatio = weightedLong,
-                shortRatio = 1.0 - weightedLong,
-                exchangeBreakdowns = exchanges,
-                recentLiquidations = allLiquidations.take(200),
-                heatmapBuckets = heatmapBuckets,
-                lastUpdated = System.currentTimeMillis()
-            )
         }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
     }
 
-    private suspend fun fetchOrderbookDepth(baseCoin: String): List<DepthLevel> {
+    // ─── On-Demand Heatmap (Cloud Function Call) ─────────────────────
+
+    suspend fun getHeatmapOnDemand(
+        symbol: String,
+        timeframe: String
+    ): AggregatedLiquidationData {
         return try {
-            val book = binanceFutures.getOrderbookDepth(symbol = binanceSymbol(baseCoin), limit = 50)
-            val result = mutableListOf<DepthLevel>()
-            book.bids.forEach { bid ->
-                val price = bid.getOrNull(0)?.toDoubleOrNull() ?: return@forEach
-                val qty = bid.getOrNull(1)?.toDoubleOrNull() ?: return@forEach
-                result.add(DepthLevel(price, qty * price, isBid = true))
+            // First try RTDB cache
+            val cached = tryGetCachedHeatmap(symbol, timeframe)
+            if (cached != null && System.currentTimeMillis() - cached.lastUpdated < 30_000) {
+                return cached
             }
-            book.asks.forEach { ask ->
-                val price = ask.getOrNull(0)?.toDoubleOrNull() ?: return@forEach
-                val qty = ask.getOrNull(1)?.toDoubleOrNull() ?: return@forEach
-                result.add(DepthLevel(price, qty * price, isBid = false))
-            }
-            result
+
+            // Call Cloud Function for fresh data
+            val result = functions
+                .getHttpsCallable("onDemandHeatmap")
+                .call(mapOf("symbol" to symbol.uppercase(), "timeframe" to timeframe.uppercase()))
+                .await()
+
+            @Suppress("UNCHECKED_CAST")
+            val map = result.getData() as? Map<String, Any?> ?: return cached ?: AggregatedLiquidationData(baseCoin = symbol)
+
+            parseHeatmapMap(map, symbol)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            emptyList()
+            Log.w(TAG, "On-demand heatmap failed: ${e.message}", e)
+
+            // Fallback: try RTDB cache regardless of age
+            tryGetCachedHeatmap(symbol, timeframe) ?: AggregatedLiquidationData(baseCoin = symbol)
         }
     }
+
+    private suspend fun tryGetCachedHeatmap(symbol: String, timeframe: String): AggregatedLiquidationData? {
+        return try {
+            val snap = database.getReference("heatmap/${symbol.uppercase()}/${timeframe.uppercase()}")
+                .get().await()
+            if (snap.exists()) parseHeatmapSnapshot(snap, symbol) else null
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            null
+        }
+    }
+
+    // ─── User Preferences (Firebase RTDB) ────────────────────────────
+
+    suspend fun saveUserPreferences(timeframe: String, threshold: Float, coin: String) {
+        val uid = auth.currentUser?.uid ?: return
+        try {
+            database.getReference("users/$uid/heatmapSettings")
+                .setValue(mapOf(
+                    "timeframe" to timeframe,
+                    "threshold" to threshold.toDouble(),
+                    "lastCoin" to coin
+                )).await()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "Save preferences failed", e)
+        }
+    }
+
+    suspend fun loadUserPreferences(): HeatmapPreferences {
+        val uid = auth.currentUser?.uid ?: return HeatmapPreferences()
+        return try {
+            val snap = database.getReference("users/$uid/heatmapSettings").get().await()
+            if (!snap.exists()) return HeatmapPreferences()
+            HeatmapPreferences(
+                timeframe = snap.child("timeframe").getValue(String::class.java) ?: "24H",
+                threshold = (snap.child("threshold").getValue(Double::class.java) ?: 0.5).toFloat(),
+                lastCoin = snap.child("lastCoin").getValue(String::class.java) ?: "BTC"
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            HeatmapPreferences()
+        }
+    }
+
+    // ─── OI History & Long/Short (Direct Binance REST) ───────────────
 
     suspend fun getOpenInterestHistory(
         baseCoin: String, period: String = "5m", limit: Int = 30
     ): List<OIHistoryPoint> {
         return try {
             binanceFutures.getOpenInterestHistory(
-                symbol = binanceSymbol(baseCoin), period = period, limit = limit
+                symbol = "${baseCoin}USDT", period = period, limit = limit
             ).map {
-                OIHistoryPoint(it.timestamp, it.sumOpenInterest.toDoubleOrNull() ?: 0.0,
-                    it.sumOpenInterestValue.toDoubleOrNull() ?: 0.0)
+                OIHistoryPoint(
+                    it.timestamp,
+                    it.sumOpenInterest.toDoubleOrNull() ?: 0.0,
+                    it.sumOpenInterestValue.toDoubleOrNull() ?: 0.0
+                )
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -198,10 +204,14 @@ class LiquidationRepository @Inject constructor(
     ): List<LongShortPoint> {
         return try {
             binanceFutures.getTopLongShortRatio(
-                symbol = binanceSymbol(baseCoin), period = period, limit = limit
+                symbol = "${baseCoin}USDT", period = period, limit = limit
             ).map {
-                LongShortPoint(it.timestamp, it.longAccount.toDoubleOrNull() ?: 0.5,
-                    it.shortAccount.toDoubleOrNull() ?: 0.5, it.longShortRatio.toDoubleOrNull() ?: 1.0)
+                LongShortPoint(
+                    it.timestamp,
+                    it.longAccount.toDoubleOrNull() ?: 0.5,
+                    it.shortAccount.toDoubleOrNull() ?: 0.5,
+                    it.longShortRatio.toDoubleOrNull() ?: 1.0
+                )
             }
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -209,163 +219,115 @@ class LiquidationRepository @Inject constructor(
         }
     }
 
-    // ─── Professional Heatmap Builder ────────────────────────────────
+    // ─── RTDB Data Parsers ───────────────────────────────────────────
 
-    private fun buildProfessionalHeatmap(
-        exchangeDataList: List<ExchangeData>,
-        liquidations: List<LiquidationEvent>,
-        markPrice: Double,
-        baseCoin: String,
-        orderbookDepth: List<DepthLevel>
-    ): List<HeatmapBucket> {
-        if (markPrice <= 0) return emptyList()
+    private fun parseHeatmapSnapshot(snapshot: DataSnapshot, baseCoin: String): AggregatedLiquidationData {
+        val markPrice = snapshot.child("markPrice").getValue(Double::class.java) ?: 0.0
+        val totalOI = snapshot.child("totalOI").getValue(Double::class.java) ?: 0.0
+        val fundingRate = snapshot.child("fundingRate").getValue(Double::class.java) ?: 0.0
+        val longRatio = snapshot.child("longRatio").getValue(Double::class.java) ?: 0.5
+        val shortRatio = snapshot.child("shortRatio").getValue(Double::class.java) ?: 0.5
+        val lastUpdated = snapshot.child("lastUpdated").getValue(Long::class.java) ?: 0L
 
-        val rangePercent = when (baseCoin.uppercase()) {
-            "BTC" -> 0.12; "ETH" -> 0.15; else -> 0.15
-        }
-        val range = markPrice * rangePercent
-        val bucketCount = 80
-        val bucketSize = (range * 2) / bucketCount
-        val minPrice = markPrice - range
-
-        val totalWeightedOI = exchangeDataList.sumOf { ex ->
-            (EXCHANGE_WEIGHTS[ex.exchange] ?: 0.1) * ex.openInterestUsd
-        }
-        val avgFunding = exchangeDataList.map { it.fundingRate }.average()
-        val volatilityFactor = 1.0 + abs(avgFunding) * 100.0
-
-        return (0 until bucketCount).map { i ->
-            val low = minPrice + (i * bucketSize)
-            val high = low + bucketSize
-            val mid = (low + high) / 2
-            val priceDistPct = abs(mid - markPrice) / markPrice
-
-            val realLongLiq = liquidations.filter { it.side == LiqSide.LONG && it.price in low..high }.sumOf { it.usdValue }
-            val realShortLiq = liquidations.filter { it.side == LiqSide.SHORT && it.price in low..high }.sumOf { it.usdValue }
-
-            var estLong = 0.0; var estShort = 0.0
-            for (tier in LEVERAGE_TIERS) {
-                val longLiqPrice = markPrice * (1.0 - 1.0 / tier.leverage)
-                val shortLiqPrice = markPrice * (1.0 + 1.0 / tier.leverage)
-                val sigma = bucketSize * 2.5
-                val longW = gaussianDensity(abs(mid - longLiqPrice), sigma)
-                val shortW = gaussianDensity(abs(mid - shortLiqPrice), sigma)
-                val contrib = totalWeightedOI * tier.weight * volatilityFactor
-                estLong += contrib * longW * tier.leverage
-                estShort += contrib * shortW * tier.leverage
-            }
-
-            val depthBoost = orderbookDepth.filter { it.price in low..high }.sumOf { it.usdValue } * 0.1
-            val decay = if (priceDistPct > 0.001) 1.0 / (1.0 + priceDistPct * 5.0) else 1.0
-
-            val totalLong = realLongLiq + estLong * decay + depthBoost * 0.4
-            val totalShort = realShortLiq + estShort * decay + depthBoost * 0.6
-
-            HeatmapBucket(
-                priceLevel = mid, priceLow = low, priceHigh = high,
-                longLiquidationUsd = totalLong, shortLiquidationUsd = totalShort,
-                totalLiquidationUsd = (totalLong + totalShort) * decay,
-                eventCount = liquidations.count { it.price in low..high },
-                isEstimated = realLongLiq + realShortLiq < 1.0
-            )
-        }
-    }
-
-    private fun gaussianDensity(distance: Double, sigma: Double): Double {
-        if (sigma <= 0) return 0.0
-        return exp(-(distance * distance) / (2.0 * sigma * sigma))
-    }
-
-    // ─── Per-Exchange Fetchers ────────────────────────────────────────
-
-    private suspend fun fetchBinanceData(baseCoin: String): ExchangeData? {
-        return try {
-            val symbol = binanceSymbol(baseCoin)
-            val oi = binanceFutures.getOpenInterest(symbol)
-            val funding = binanceFutures.getFundingRate(symbol, limit = 1).firstOrNull()
-            val premium = binanceFutures.getPremiumIndex(symbol)
-            val lsRatio = binanceFutures.getGlobalLongShortRatio(symbol, limit = 1).firstOrNull()
-            val liquidations = try { binanceFutures.getForceOrders(symbol, limit = 100) } catch (_: Exception) { emptyList() }
-
-            val markPrice = premium.markPrice.toDoubleOrNull() ?: 0.0
-            val oiUsd = oi.openInterest.toDoubleOrNull()?.let { it * markPrice } ?: 0.0
-
+        val exchanges = snapshot.child("exchanges").children.mapNotNull { exSnap ->
             ExchangeData(
-                exchange = "Binance", openInterestUsd = oiUsd,
-                fundingRate = funding?.fundingRate?.toDoubleOrNull() ?: 0.0,
-                markPrice = markPrice,
-                longRatio = lsRatio?.longAccount?.toDoubleOrNull() ?: 0.5,
-                shortRatio = lsRatio?.shortAccount?.toDoubleOrNull() ?: 0.5,
-                recentLiquidations = liquidations.map {
-                    LiquidationEvent("Binance", it.averagePrice.toDoubleOrNull() ?: 0.0,
-                        it.executedQty.toDoubleOrNull() ?: 0.0,
-                        if (it.side == "BUY") LiqSide.SHORT else LiqSide.LONG, it.time,
-                        (it.averagePrice.toDoubleOrNull() ?: 0.0) * (it.executedQty.toDoubleOrNull() ?: 0.0))
-                }
+                exchange = exSnap.child("name").getValue(String::class.java) ?: return@mapNotNull null,
+                openInterestUsd = exSnap.child("oi").getValue(Double::class.java) ?: 0.0,
+                fundingRate = exSnap.child("funding").getValue(Double::class.java) ?: 0.0,
+                markPrice = exSnap.child("markPrice").getValue(Double::class.java) ?: 0.0
             )
-        } catch (e: Exception) { if (e is CancellationException) throw e; Log.w(TAG, "Binance failed", e); null }
+        }
+
+        val buckets = snapshot.child("buckets").children.mapNotNull { bSnap ->
+            HeatmapBucket(
+                priceLevel = bSnap.child("priceLevel").getValue(Double::class.java) ?: return@mapNotNull null,
+                priceLow = bSnap.child("priceLow").getValue(Double::class.java) ?: 0.0,
+                priceHigh = bSnap.child("priceHigh").getValue(Double::class.java) ?: 0.0,
+                longLiquidationUsd = bSnap.child("longUsd").getValue(Double::class.java) ?: 0.0,
+                shortLiquidationUsd = bSnap.child("shortUsd").getValue(Double::class.java) ?: 0.0,
+                totalLiquidationUsd = bSnap.child("totalUsd").getValue(Double::class.java) ?: 0.0,
+                eventCount = bSnap.child("events").getValue(Int::class.java) ?: 0
+            )
+        }
+
+        val liquidations = snapshot.child("recentLiquidations").children.mapNotNull { lSnap ->
+            LiquidationEvent(
+                exchange = lSnap.child("exchange").getValue(String::class.java) ?: return@mapNotNull null,
+                price = lSnap.child("price").getValue(Double::class.java) ?: 0.0,
+                quantity = lSnap.child("qty").getValue(Double::class.java) ?: 0.0,
+                side = if (lSnap.child("side").getValue(String::class.java) == "LONG") LiqSide.LONG else LiqSide.SHORT,
+                timestamp = lSnap.child("time").getValue(Long::class.java) ?: 0L,
+                usdValue = lSnap.child("usd").getValue(Double::class.java) ?: 0.0
+            )
+        }
+
+        return AggregatedLiquidationData(
+            baseCoin = baseCoin,
+            markPrice = markPrice,
+            totalOpenInterestUsd = totalOI,
+            aggregatedFundingRate = fundingRate,
+            longRatio = longRatio,
+            shortRatio = shortRatio,
+            exchangeBreakdowns = exchanges,
+            recentLiquidations = liquidations,
+            heatmapBuckets = buckets,
+            lastUpdated = lastUpdated
+        )
     }
 
-    private suspend fun fetchBybitData(baseCoin: String): ExchangeData? {
-        return try {
-            val symbol = bybitSymbol(baseCoin)
-            val ticker = bybitApi.getTickers(symbol = symbol).result?.list?.firstOrNull() ?: return null
-            val funding = bybitApi.getFundingHistory(symbol = symbol, limit = 1).result?.list?.firstOrNull()
-            ExchangeData("Bybit", ticker.openInterestValue.toDoubleOrNull() ?: 0.0,
-                funding?.fundingRate?.toDoubleOrNull() ?: ticker.fundingRate.toDoubleOrNull() ?: 0.0,
-                ticker.lastPrice.toDoubleOrNull() ?: 0.0, 0.5, 0.5, emptyList())
-        } catch (e: Exception) { if (e is CancellationException) throw e; Log.w(TAG, "Bybit failed", e); null }
-    }
+    @Suppress("UNCHECKED_CAST")
+    private fun parseHeatmapMap(map: Map<String, Any?>, baseCoin: String): AggregatedLiquidationData {
+        val markPrice = (map["markPrice"] as? Number)?.toDouble() ?: 0.0
+        val totalOI = (map["totalOI"] as? Number)?.toDouble() ?: 0.0
+        val fundingRate = (map["fundingRate"] as? Number)?.toDouble() ?: 0.0
+        val longRatio = (map["longRatio"] as? Number)?.toDouble() ?: 0.5
+        val shortRatio = (map["shortRatio"] as? Number)?.toDouble() ?: 0.5
+        val lastUpdated = (map["lastUpdated"] as? Number)?.toLong() ?: 0L
 
-    private suspend fun fetchOkxData(baseCoin: String): ExchangeData? {
-        return try {
-            val instId = okxSymbol(baseCoin)
-            val oi = okxApi.getOpenInterest(instId = instId).data?.firstOrNull()
-            val fund = okxApi.getFundingRate(instId = instId).data?.firstOrNull()
-            val mark = okxApi.getMarkPrice(instId = instId).data?.firstOrNull()
-            val liqs = try {
-                okxApi.getLiquidationOrders(instId = instId).data?.flatMap { w ->
-                    w.details?.map { d ->
-                        LiquidationEvent("OKX", d.px.toDoubleOrNull() ?: 0.0, d.sz.toDoubleOrNull() ?: 0.0,
-                            if (d.side == "buy") LiqSide.SHORT else LiqSide.LONG,
-                            d.ts.toLongOrNull() ?: 0L,
-                            (d.px.toDoubleOrNull() ?: 0.0) * (d.sz.toDoubleOrNull() ?: 0.0))
-                    } ?: emptyList()
-                } ?: emptyList()
-            } catch (_: Exception) { emptyList() }
-            val markPrice = mark?.markPx?.toDoubleOrNull() ?: 0.0
-            ExchangeData("OKX", oi?.oi?.toDoubleOrNull()?.let { it * markPrice } ?: 0.0,
-                fund?.fundingRate?.toDoubleOrNull() ?: 0.0, markPrice, 0.5, 0.5, liqs)
-        } catch (e: Exception) { if (e is CancellationException) throw e; Log.w(TAG, "OKX failed", e); null }
-    }
+        val exchanges = (map["exchanges"] as? List<Map<String, Any?>>)?.mapNotNull { ex ->
+            ExchangeData(
+                exchange = ex["name"] as? String ?: return@mapNotNull null,
+                openInterestUsd = (ex["oi"] as? Number)?.toDouble() ?: 0.0,
+                fundingRate = (ex["funding"] as? Number)?.toDouble() ?: 0.0,
+                markPrice = (ex["markPrice"] as? Number)?.toDouble() ?: 0.0
+            )
+        } ?: emptyList()
 
-    private suspend fun fetchBitgetData(baseCoin: String): ExchangeData? {
-        return try {
-            val symbol = bitgetSymbol(baseCoin)
-            val oiResp = bitgetApi.getOpenInterest(symbol = symbol)
-            val fund = bitgetApi.getFundingRate(symbol = symbol).data?.firstOrNull()
-            val ticker = bitgetApi.getTickers().data?.find { it.symbol.contains(baseCoin, ignoreCase = true) }
-            val markPrice = ticker?.lastPr?.toDoubleOrNull() ?: 0.0
-            ExchangeData("Bitget", oiResp.data?.amount?.toDoubleOrNull()?.let { it * markPrice } ?: 0.0,
-                fund?.fundingRate?.toDoubleOrNull() ?: 0.0, markPrice, 0.5, 0.5, emptyList())
-        } catch (e: Exception) { if (e is CancellationException) throw e; Log.w(TAG, "Bitget failed", e); null }
-    }
+        val buckets = (map["buckets"] as? List<Map<String, Any?>>)?.mapNotNull { b ->
+            HeatmapBucket(
+                priceLevel = (b["priceLevel"] as? Number)?.toDouble() ?: return@mapNotNull null,
+                priceLow = (b["priceLow"] as? Number)?.toDouble() ?: 0.0,
+                priceHigh = (b["priceHigh"] as? Number)?.toDouble() ?: 0.0,
+                longLiquidationUsd = (b["longUsd"] as? Number)?.toDouble() ?: 0.0,
+                shortLiquidationUsd = (b["shortUsd"] as? Number)?.toDouble() ?: 0.0,
+                totalLiquidationUsd = (b["totalUsd"] as? Number)?.toDouble() ?: 0.0,
+                eventCount = (b["events"] as? Number)?.toInt() ?: 0
+            )
+        } ?: emptyList()
 
-    private suspend fun fetchGateioData(baseCoin: String): ExchangeData? {
-        return try {
-            val contract = gateioSymbol(baseCoin)
-            val info = gateioApi.getContract(contract)
-            val liqs = try {
-                gateioApi.getLiquidationOrders(contract = contract, limit = 100).map {
-                    LiquidationEvent("Gate.io", it.fill_price.toDoubleOrNull() ?: 0.0,
-                        abs(it.size.toDouble()), if (it.size > 0) LiqSide.LONG else LiqSide.SHORT,
-                        it.time * 1000L, (it.fill_price.toDoubleOrNull() ?: 0.0) * abs(it.size.toDouble()))
-                }
-            } catch (_: Exception) { emptyList() }
-            ExchangeData("Gate.io", info.open_interest.toDoubleOrNull() ?: 0.0,
-                info.funding_rate.toDoubleOrNull() ?: 0.0, info.mark_price.toDoubleOrNull() ?: 0.0,
-                0.5, 0.5, liqs)
-        } catch (e: Exception) { if (e is CancellationException) throw e; Log.w(TAG, "Gate.io failed", e); null }
+        val liquidations = (map["recentLiquidations"] as? List<Map<String, Any?>>)?.mapNotNull { l ->
+            LiquidationEvent(
+                exchange = l["exchange"] as? String ?: return@mapNotNull null,
+                price = (l["price"] as? Number)?.toDouble() ?: 0.0,
+                quantity = (l["qty"] as? Number)?.toDouble() ?: 0.0,
+                side = if (l["side"] == "LONG") LiqSide.LONG else LiqSide.SHORT,
+                timestamp = (l["time"] as? Number)?.toLong() ?: 0L,
+                usdValue = (l["usd"] as? Number)?.toDouble() ?: 0.0
+            )
+        } ?: emptyList()
+
+        return AggregatedLiquidationData(
+            baseCoin = baseCoin,
+            markPrice = markPrice,
+            totalOpenInterestUsd = totalOI,
+            aggregatedFundingRate = fundingRate,
+            longRatio = longRatio,
+            shortRatio = shortRatio,
+            exchangeBreakdowns = exchanges,
+            recentLiquidations = liquidations,
+            heatmapBuckets = buckets,
+            lastUpdated = lastUpdated
+        )
     }
 }
 
@@ -374,12 +336,74 @@ class LiquidationRepository @Inject constructor(
 // ═══════════════════════════════════════════════════════════════════════
 
 enum class LiqSide { LONG, SHORT }
-data class LeverageTier(val leverage: Double, val weight: Double)
-data class DepthLevel(val price: Double, val usdValue: Double, val isBid: Boolean)
-data class CandleData(val time: Long, val open: Double, val high: Double, val low: Double, val close: Double, val volume: Double = 0.0)
-data class LiquidationEvent(val exchange: String, val price: Double, val quantity: Double, val side: LiqSide, val timestamp: Long, val usdValue: Double)
-data class ExchangeData(val exchange: String, val openInterestUsd: Double = 0.0, val fundingRate: Double = 0.0, val markPrice: Double = 0.0, val longRatio: Double = 0.5, val shortRatio: Double = 0.5, val recentLiquidations: List<LiquidationEvent> = emptyList())
-data class HeatmapBucket(val priceLevel: Double, val priceLow: Double, val priceHigh: Double, val longLiquidationUsd: Double = 0.0, val shortLiquidationUsd: Double = 0.0, val totalLiquidationUsd: Double = 0.0, val eventCount: Int = 0, val isEstimated: Boolean = false)
-data class AggregatedLiquidationData(val baseCoin: String = "BTC", val markPrice: Double = 0.0, val totalOpenInterestUsd: Double = 0.0, val aggregatedFundingRate: Double = 0.0, val longRatio: Double = 0.5, val shortRatio: Double = 0.5, val exchangeBreakdowns: List<ExchangeData> = emptyList(), val recentLiquidations: List<LiquidationEvent> = emptyList(), val heatmapBuckets: List<HeatmapBucket> = emptyList(), val lastUpdated: Long = 0)
-data class OIHistoryPoint(val timestamp: Long, val openInterest: Double, val openInterestValue: Double)
-data class LongShortPoint(val timestamp: Long, val longRatio: Double, val shortRatio: Double, val ratio: Double)
+
+data class CandleData(
+    val time: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double = 0.0
+)
+
+data class LiquidationEvent(
+    val exchange: String,
+    val price: Double,
+    val quantity: Double,
+    val side: LiqSide,
+    val timestamp: Long,
+    val usdValue: Double
+)
+
+data class ExchangeData(
+    val exchange: String,
+    val openInterestUsd: Double = 0.0,
+    val fundingRate: Double = 0.0,
+    val markPrice: Double = 0.0,
+    val longRatio: Double = 0.5,
+    val shortRatio: Double = 0.5,
+    val recentLiquidations: List<LiquidationEvent> = emptyList()
+)
+
+data class HeatmapBucket(
+    val priceLevel: Double,
+    val priceLow: Double,
+    val priceHigh: Double,
+    val longLiquidationUsd: Double = 0.0,
+    val shortLiquidationUsd: Double = 0.0,
+    val totalLiquidationUsd: Double = 0.0,
+    val eventCount: Int = 0,
+    val isEstimated: Boolean = false
+)
+
+data class AggregatedLiquidationData(
+    val baseCoin: String = "BTC",
+    val markPrice: Double = 0.0,
+    val totalOpenInterestUsd: Double = 0.0,
+    val aggregatedFundingRate: Double = 0.0,
+    val longRatio: Double = 0.5,
+    val shortRatio: Double = 0.5,
+    val exchangeBreakdowns: List<ExchangeData> = emptyList(),
+    val recentLiquidations: List<LiquidationEvent> = emptyList(),
+    val heatmapBuckets: List<HeatmapBucket> = emptyList(),
+    val lastUpdated: Long = 0
+)
+
+data class OIHistoryPoint(
+    val timestamp: Long,
+    val openInterest: Double,
+    val openInterestValue: Double
+)
+
+data class LongShortPoint(
+    val timestamp: Long,
+    val longRatio: Double,
+    val shortRatio: Double,
+    val ratio: Double
+)
+
+data class HeatmapPreferences(
+    val timeframe: String = "24H",
+    val threshold: Float = 0.5f,
+    val lastCoin: String = "BTC"
+)

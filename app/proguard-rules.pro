@@ -113,6 +113,11 @@
 -keep class com.coinlab.app.data.remote.firebase.ExchangeData { *; }
 -keep class com.coinlab.app.data.remote.firebase.LiquidationEvent { *; }
 
+# v12.2 — Heatmap user preferences
+-keep class com.coinlab.app.data.remote.firebase.HeatmapPreferences { *; }
+-keep class com.coinlab.app.data.remote.firebase.OIHistoryPoint { *; }
+-keep class com.coinlab.app.data.remote.firebase.LongShortPoint { *; }
+
 # v12.1 — WebView JavaScript Interface
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;

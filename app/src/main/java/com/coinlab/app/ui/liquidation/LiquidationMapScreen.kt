@@ -6,8 +6,11 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -50,7 +53,8 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════
-// v12.1 — Professional Liquidation Map with TradingView WebView Chart
+// v12.2 — CoinGlass-Grade Liquidation Heatmap Engine
+// Search bar, threshold slider, model dropdown, zoom, gradient legend
 // ═══════════════════════════════════════════════════════════════════════
 
 private val HeatmapText = Color(0xFF8888AA)
@@ -106,6 +110,14 @@ fun LiquidationMapScreen(
                             modifier = Modifier.padding(end = 4.dp)
                         )
                     }
+                    // Fullscreen / Zoom toggle
+                    IconButton(onClick = { viewModel.toggleFullscreen() }) {
+                        Icon(
+                            if (uiState.isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                            contentDescription = stringResource(R.string.liquidation_zoom),
+                            tint = CoinLabGold
+                        )
+                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(
                             Icons.Filled.Refresh,
@@ -145,23 +157,46 @@ fun LiquidationMapScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Coin selector
-                item { CoinSelector(uiState.selectedCoin, viewModel.availableCoins, viewModel::selectCoin) }
+                // Symbol Search Bar
+                item {
+                    SymbolSearchBar(
+                        query = uiState.searchQuery,
+                        onQueryChange = viewModel::setSearchQuery
+                    )
+                }
+
+                // Coin selector (filtered by search)
+                item { CoinSelector(uiState.selectedCoin, viewModel.filteredCoins, viewModel::selectCoin) }
 
                 // Time filter chips
                 item { TimeFilterRow(uiState.timeFilter, viewModel.timeFilters, viewModel::setTimeFilter) }
 
+                // Model dropdown + threshold slider row
+                item {
+                    HeatmapControlsRow(
+                        selectedModel = uiState.selectedModel,
+                        availableModels = viewModel.availableModels,
+                        onModelSelect = viewModel::setModel,
+                        threshold = uiState.threshold,
+                        onThresholdChange = viewModel::setThreshold
+                    )
+                }
+
                 // Professional WebView Chart
                 item {
+                    val chartHeight = if (uiState.isFullscreen) 600.dp else 420.dp
                     LiquidationChartWebView(
                         viewModel = viewModel,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(420.dp)
+                            .height(chartHeight)
                             .padding(horizontal = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                     )
                 }
+
+                // Gradient scale legend
+                item { GradientScaleLegend() }
 
                 // Stats overview cards
                 item {
@@ -272,6 +307,8 @@ private fun LiquidationChartWebView(
                 is ChartCommand.SetHeatmap -> "setHeatmapData('${cmd.json.escapeForJs()}')"
                 is ChartCommand.SetMarkPrice -> "setMarkPrice(${cmd.price})"
                 is ChartCommand.SetPrecision -> "setPricePrecision(${cmd.precision}, ${cmd.minMove})"
+                is ChartCommand.SetThreshold -> "setThreshold(${cmd.value})"
+                is ChartCommand.SetModel -> "setModel('${cmd.model}')"
             }
             wv.post { wv.evaluateJavascript(js, null) }
         }
@@ -724,6 +761,219 @@ private fun LiquidationEventRow(event: LiquidationEvent, baseCoin: String) {
                     fontSize = 11.sp
                 )
             }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Symbol Search Bar
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun SymbolSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        placeholder = {
+            Text(
+                stringResource(R.string.liquidation_search_hint),
+                color = HeatmapText,
+                fontSize = 14.sp
+            )
+        },
+        leadingIcon = {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = CoinLabGold, modifier = Modifier.size(20.dp))
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = null, tint = HeatmapText, modifier = Modifier.size(18.dp))
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = CoinLabGreen,
+            unfocusedBorderColor = Color(0xFF2A2010),
+            cursorColor = CoinLabGreen,
+            focusedContainerColor = Color(0xFF0D0A00),
+            unfocusedContainerColor = Color(0xFF0D0A00),
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White
+        )
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Heatmap Controls: Model Dropdown + Threshold Slider
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun HeatmapControlsRow(
+    selectedModel: String,
+    availableModels: List<String>,
+    onModelSelect: (String) -> Unit,
+    threshold: Float,
+    onThresholdChange: (Float) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Model selector row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                stringResource(R.string.liquidation_model),
+                color = HeatmapText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+
+            var expanded by remember { mutableStateOf(false) }
+
+            Box {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF1A1400),
+                    modifier = Modifier.clickable { expanded = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            selectedModel,
+                            color = CoinLabGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Filled.ArrowDropDown,
+                            contentDescription = null,
+                            tint = CoinLabGold,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(Color(0xFF1A1400))
+                ) {
+                    availableModels.forEach { model ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    when (model) {
+                                        "Standard" -> stringResource(R.string.liquidation_model_standard)
+                                        "Aggressive" -> stringResource(R.string.liquidation_model_aggressive)
+                                        "Conservative" -> stringResource(R.string.liquidation_model_conservative)
+                                        else -> model
+                                    },
+                                    color = if (model == selectedModel) CoinLabGreen else Color.White,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            onClick = {
+                                onModelSelect(model)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Threshold slider
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                stringResource(R.string.liquidation_threshold),
+                color = HeatmapText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.width(52.dp)
+            )
+            Slider(
+                value = threshold,
+                onValueChange = onThresholdChange,
+                modifier = Modifier.weight(1f),
+                valueRange = 0f..1f,
+                steps = 9,
+                colors = SliderDefaults.colors(
+                    thumbColor = CoinLabGreen,
+                    activeTrackColor = CoinLabGreen,
+                    inactiveTrackColor = Color(0xFF1A1400)
+                )
+            )
+            Text(
+                "${(threshold * 100).roundToInt()}%",
+                color = CoinLabGold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.width(40.dp),
+                textAlign = TextAlign.End
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Gradient Scale Legend
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun GradientScaleLegend() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        // Gradient bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color(0xFF4B0082),  // Purple — low
+                            Color(0xFF0064C8),  // Blue
+                            Color(0xFF00C853),  // Green
+                            Color(0xFFFFC107),  // Yellow
+                            Color(0xFFFF1744)   // Red — high
+                        )
+                    )
+                )
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Düşük", color = HeatmapText, fontSize = 10.sp)
+            Text("Orta", color = HeatmapText, fontSize = 10.sp)
+            Text("Yüksek", color = HeatmapText, fontSize = 10.sp)
+            Text("Aşırı", color = CoinLabRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

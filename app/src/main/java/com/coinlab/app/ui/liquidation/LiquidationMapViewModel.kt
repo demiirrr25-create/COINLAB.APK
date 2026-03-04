@@ -11,7 +11,6 @@ import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -24,15 +23,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * v12.1 — Professional Liquidation Map ViewModel
+ * v12.2 — CoinGlass-Grade Liquidation Heatmap ViewModel
  *
- * WebView chart engine integration with real-time WebSocket data.
- * Kline + heatmap data formatted as JSON for TradingView Lightweight Charts.
+ * Architecture:
+ *   - Firebase RTDB listener for real-time heatmap data (backend-computed)
+ *   - Binance Futures WebSocket for real-time kline/mark price (<500ms)
+ *   - Cloud Function callable for initial data load
+ *   - User preferences saved to Firebase RTDB
+ *
+ * Timeframes: 24H, 48H, 1W, 1M, 3M
+ * Models: Standard, Aggressive, Conservative
  */
 
 data class LiquidationUiState(
     val selectedCoin: String = "BTC",
-    val timeFilter: String = "1h",
+    val timeFilter: String = "24H",
+    val threshold: Float = 0.5f,
+    val selectedModel: String = "Standard",
+    val searchQuery: String = "",
     val aggregatedData: AggregatedLiquidationData? = null,
     val oiHistory: List<OIHistoryPoint> = emptyList(),
     val lsHistory: List<LongShortPoint> = emptyList(),
@@ -42,7 +50,8 @@ data class LiquidationUiState(
     val candleJson: String = "",
     val heatmapJson: String = "",
     val markPrice: Double = 0.0,
-    val wsConnected: Boolean = false
+    val wsConnected: Boolean = false,
+    val isFullscreen: Boolean = false
 )
 
 /** JS evaluation commands sent to WebView */
@@ -52,6 +61,8 @@ sealed class ChartCommand {
     data class SetHeatmap(val json: String) : ChartCommand()
     data class SetMarkPrice(val price: Double) : ChartCommand()
     data class SetPrecision(val precision: Int, val minMove: Double) : ChartCommand()
+    data class SetThreshold(val value: Float) : ChartCommand()
+    data class SetModel(val model: String) : ChartCommand()
 }
 
 @HiltViewModel
@@ -71,9 +82,8 @@ class LiquidationMapViewModel @Inject constructor(
     val chartCommands: SharedFlow<ChartCommand> = _chartCommands.asSharedFlow()
 
     private val gson = Gson()
-
-    private var refreshJob: Job? = null
     private var wsJob: Job? = null
+    private var rtdbJob: Job? = null
 
     val availableCoins = listOf(
         "BTC", "ETH", "SOL", "BNB", "XRP",
@@ -81,7 +91,8 @@ class LiquidationMapViewModel @Inject constructor(
         "LINK", "UNI", "APT", "ARB", "OP"
     )
 
-    val timeFilters = listOf("1m", "5m", "15m", "1h", "4h", "1d")
+    val timeFilters = listOf("24H", "48H", "1W", "1M", "3M")
+    val availableModels = listOf("Standard", "Aggressive", "Conservative")
 
     private val coinPrecision = mapOf(
         "BTC" to Pair(2, 0.01), "ETH" to Pair(2, 0.01),
@@ -94,14 +105,31 @@ class LiquidationMapViewModel @Inject constructor(
         "OP" to Pair(4, 0.0001)
     )
 
+    // Map timeframes to kline intervals for chart
+    private val timeframeToKlineInterval = mapOf(
+        "24H" to "1h", "48H" to "2h", "1W" to "4h", "1M" to "1d", "3M" to "1d"
+    )
+    private val timeframeToKlineLimit = mapOf(
+        "24H" to 24, "48H" to 24, "1W" to 42, "1M" to 30, "3M" to 90
+    )
+
+    val filteredCoins: List<String>
+        get() {
+            val query = _uiState.value.searchQuery
+            return if (query.isBlank()) availableCoins
+            else availableCoins.filter { it.contains(query, ignoreCase = true) }
+        }
+
     init {
+        loadUserPreferences()
         loadData()
-        startAutoRefresh()
     }
+
+    // ─── Public Actions ─────────────────────────────────────────────
 
     fun selectCoin(coin: String) {
         if (coin != _uiState.value.selectedCoin) {
-            _uiState.update { it.copy(selectedCoin = coin, isLoading = true) }
+            _uiState.update { it.copy(selectedCoin = coin, isLoading = true, error = null) }
             loadData()
         }
     }
@@ -110,8 +138,26 @@ class LiquidationMapViewModel @Inject constructor(
         if (filter != _uiState.value.timeFilter) {
             _uiState.update { it.copy(timeFilter = filter) }
             loadChartData()
-            restartWebSocket()
+            startRtdbListener()
         }
+    }
+
+    fun setThreshold(value: Float) {
+        _uiState.update { it.copy(threshold = value) }
+        _chartCommands.tryEmit(ChartCommand.SetThreshold(value))
+    }
+
+    fun setModel(model: String) {
+        _uiState.update { it.copy(selectedModel = model) }
+        _chartCommands.tryEmit(ChartCommand.SetModel(model))
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun toggleFullscreen() {
+        _uiState.update { it.copy(isFullscreen = !it.isFullscreen) }
     }
 
     fun refresh() {
@@ -124,6 +170,8 @@ class LiquidationMapViewModel @Inject constructor(
         val state = _uiState.value
         val (prec, minMove) = coinPrecision[state.selectedCoin] ?: Pair(2, 0.01)
         _chartCommands.tryEmit(ChartCommand.SetPrecision(prec, minMove))
+        _chartCommands.tryEmit(ChartCommand.SetThreshold(state.threshold))
+        _chartCommands.tryEmit(ChartCommand.SetModel(state.selectedModel))
 
         if (state.candleJson.isNotEmpty()) {
             _chartCommands.tryEmit(ChartCommand.SetCandleData(state.candleJson))
@@ -137,80 +185,29 @@ class LiquidationMapViewModel @Inject constructor(
         startWebSocket()
     }
 
+    // ─── Data Loading ───────────────────────────────────────────────
+
     private fun loadData() {
         viewModelScope.launch {
             try {
                 val coin = _uiState.value.selectedCoin
                 val tf = _uiState.value.timeFilter
 
-                // Parallel: kline + aggregated + OI + L/S
-                val klineJob = launch {
-                    try {
-                        val klines = repository.getKlineData(coin, tf, 500)
-                        val json = gson.toJson(klines)
-                        _uiState.update { it.copy(candleJson = json) }
-                        _chartCommands.tryEmit(ChartCommand.SetCandleData(json))
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        Log.w(TAG, "Kline load failed", e)
-                    }
-                }
-
-                val aggregatedJob = launch {
-                    try {
-                        val data = repository.getAggregatedData(coin)
-                        _uiState.update { it.copy(aggregatedData = data, markPrice = data.markPrice) }
-
-                        // Send heatmap data to chart
-                        val heatmapList = data.heatmapBuckets.map { b ->
-                            mapOf(
-                                "priceLevel" to b.priceLevel,
-                                "longUsd" to b.longLiquidationUsd,
-                                "shortUsd" to b.shortLiquidationUsd,
-                                "totalUsd" to b.totalLiquidationUsd
-                            )
-                        }
-                        val hJson = gson.toJson(heatmapList)
-                        _uiState.update { it.copy(heatmapJson = hJson) }
-                        _chartCommands.tryEmit(ChartCommand.SetHeatmap(hJson))
-
-                        if (data.markPrice > 0) {
-                            _chartCommands.tryEmit(ChartCommand.SetMarkPrice(data.markPrice))
-                        }
-
-                        // Set precision
-                        val (prec, minMove) = coinPrecision[coin] ?: Pair(2, 0.01)
-                        _chartCommands.tryEmit(ChartCommand.SetPrecision(prec, minMove))
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        _uiState.update { it.copy(error = "Veri yüklenemedi: ${e.message}") }
-                    }
-                }
-
-                val oiJob = launch {
-                    try {
-                        val history = repository.getOpenInterestHistory(coin, tf)
-                        _uiState.update { it.copy(oiHistory = history) }
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                    }
-                }
-
-                val lsJob = launch {
-                    try {
-                        val history = repository.getLongShortHistory(coin, tf)
-                        _uiState.update { it.copy(lsHistory = history) }
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                    }
-                }
+                // Parallel: kline + on-demand heatmap + OI + L/S
+                val klineJob = launch { loadKlineData(coin, tf) }
+                val heatmapJob = launch { loadHeatmapData(coin, tf) }
+                val oiJob = launch { loadOIHistory(coin) }
+                val lsJob = launch { loadLSHistory(coin) }
 
                 klineJob.join()
-                aggregatedJob.join()
+                heatmapJob.join()
                 oiJob.join()
                 lsJob.join()
 
                 _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = null) }
+
+                // Start real-time listeners
+                startRtdbListener()
                 startWebSocket()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -221,33 +218,106 @@ class LiquidationMapViewModel @Inject constructor(
         }
     }
 
-    private fun loadChartData() {
-        viewModelScope.launch {
-            try {
-                val coin = _uiState.value.selectedCoin
-                val tf = _uiState.value.timeFilter
-                val klines = repository.getKlineData(coin, tf, 500)
-                val json = gson.toJson(klines)
-                _uiState.update { it.copy(candleJson = json) }
-                _chartCommands.tryEmit(ChartCommand.SetCandleData(json))
-
-                val oiHistory = repository.getOpenInterestHistory(coin, tf)
-                val lsHistory = repository.getLongShortHistory(coin, tf)
-                _uiState.update { it.copy(oiHistory = oiHistory, lsHistory = lsHistory) }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
+    private suspend fun loadKlineData(coin: String, tf: String) {
+        try {
+            val interval = timeframeToKlineInterval[tf] ?: "1h"
+            val limit = timeframeToKlineLimit[tf] ?: 100
+            val klines = repository.getKlineData(coin, interval, limit)
+            val json = gson.toJson(klines)
+            _uiState.update { it.copy(candleJson = json) }
+            _chartCommands.tryEmit(ChartCommand.SetCandleData(json))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "Kline load failed", e)
         }
     }
+
+    private suspend fun loadHeatmapData(coin: String, tf: String) {
+        try {
+            val data = repository.getHeatmapOnDemand(coin, tf)
+            processHeatmapData(data, coin)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            _uiState.update { it.copy(error = "Heatmap yüklenemedi: ${e.message}") }
+        }
+    }
+
+    private suspend fun loadOIHistory(coin: String) {
+        try {
+            val history = repository.getOpenInterestHistory(coin, "5m")
+            _uiState.update { it.copy(oiHistory = history) }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+        }
+    }
+
+    private suspend fun loadLSHistory(coin: String) {
+        try {
+            val history = repository.getLongShortHistory(coin, "5m")
+            _uiState.update { it.copy(lsHistory = history) }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+        }
+    }
+
+    private fun loadChartData() {
+        viewModelScope.launch {
+            val coin = _uiState.value.selectedCoin
+            val tf = _uiState.value.timeFilter
+            loadKlineData(coin, tf)
+        }
+    }
+
+    // ─── Firebase RTDB Real-Time Listener ────────────────────────────
+
+    private fun startRtdbListener() {
+        rtdbJob?.cancel()
+        val coin = _uiState.value.selectedCoin
+        val tf = _uiState.value.timeFilter
+
+        rtdbJob = viewModelScope.launch {
+            repository.observeHeatmapData(coin, tf)
+                .catch { e -> Log.w(TAG, "RTDB error: ${e.message}") }
+                .collect { data ->
+                    processHeatmapData(data, coin)
+                }
+        }
+    }
+
+    private fun processHeatmapData(data: AggregatedLiquidationData, coin: String) {
+        _uiState.update { it.copy(aggregatedData = data, markPrice = data.markPrice) }
+
+        val heatmapList = data.heatmapBuckets.map { b ->
+            mapOf(
+                "priceLevel" to b.priceLevel,
+                "longUsd" to b.longLiquidationUsd,
+                "shortUsd" to b.shortLiquidationUsd,
+                "totalUsd" to b.totalLiquidationUsd
+            )
+        }
+        val hJson = gson.toJson(heatmapList)
+        _uiState.update { it.copy(heatmapJson = hJson) }
+        _chartCommands.tryEmit(ChartCommand.SetHeatmap(hJson))
+
+        if (data.markPrice > 0) {
+            _chartCommands.tryEmit(ChartCommand.SetMarkPrice(data.markPrice))
+        }
+
+        val (prec, minMove) = coinPrecision[coin] ?: Pair(2, 0.01)
+        _chartCommands.tryEmit(ChartCommand.SetPrecision(prec, minMove))
+    }
+
+    // ─── WebSocket (Real-time kline + mark price) ────────────────────
 
     private fun startWebSocket() {
         wsJob?.cancel()
         val coin = _uiState.value.selectedCoin
         val tf = _uiState.value.timeFilter
         val symbol = "${coin}USDT"
+        val interval = timeframeToKlineInterval[tf] ?: "1h"
 
         wsJob = viewModelScope.launch {
-            futuresWs.connectStreams(symbol, tf)
+            futuresWs.connectStreams(symbol, interval)
                 .catch { e ->
                     Log.w(TAG, "WS error: ${e.message}")
                     _uiState.update { it.copy(wsConnected = false) }
@@ -266,16 +336,12 @@ class LiquidationMapViewModel @Inject constructor(
                             }
                         }
                         is FuturesWsEvent.Liquidation -> {
-                            // Real-time liquidation — refresh heatmap periodically
+                            // Real-time liquidation events — heatmap updates via RTDB listener
+                            Log.d(TAG, "Liq: ${event.data.side} $${event.data.usdValue}")
                         }
                     }
                 }
         }
-    }
-
-    private fun restartWebSocket() {
-        wsJob?.cancel()
-        startWebSocket()
     }
 
     private fun handleKlineUpdate(kline: FuturesKlineUpdate) {
@@ -291,41 +357,39 @@ class LiquidationMapViewModel @Inject constructor(
         _chartCommands.tryEmit(ChartCommand.UpdateCandle(json))
     }
 
-    private fun startAutoRefresh() {
-        refreshJob?.cancel()
-        refreshJob = viewModelScope.launch {
-            while (true) {
-                delay(60_000) // 60 seconds — heatmap + stats refresh
-                try {
-                    val coin = _uiState.value.selectedCoin
-                    val data = repository.getAggregatedData(coin)
-                    _uiState.update { it.copy(aggregatedData = data, markPrice = data.markPrice) }
+    // ─── User Preferences ────────────────────────────────────────────
 
-                    val heatmapList = data.heatmapBuckets.map { b ->
-                        mapOf(
-                            "priceLevel" to b.priceLevel,
-                            "longUsd" to b.longLiquidationUsd,
-                            "shortUsd" to b.shortLiquidationUsd,
-                            "totalUsd" to b.totalLiquidationUsd
-                        )
-                    }
-                    val hJson = gson.toJson(heatmapList)
-                    _uiState.update { it.copy(heatmapJson = hJson) }
-                    _chartCommands.tryEmit(ChartCommand.SetHeatmap(hJson))
-                    if (data.markPrice > 0) {
-                        _chartCommands.tryEmit(ChartCommand.SetMarkPrice(data.markPrice))
-                    }
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
+    private fun loadUserPreferences() {
+        viewModelScope.launch {
+            try {
+                val prefs = repository.loadUserPreferences()
+                _uiState.update {
+                    it.copy(
+                        selectedCoin = prefs.lastCoin,
+                        timeFilter = prefs.timeframe,
+                        threshold = prefs.threshold
+                    )
                 }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
             }
         }
     }
 
+    private fun saveUserPreferences() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            repository.saveUserPreferences(state.timeFilter, state.threshold, state.selectedCoin)
+        }
+    }
+
+    // ─── Cleanup ─────────────────────────────────────────────────────
+
     override fun onCleared() {
         super.onCleared()
-        refreshJob?.cancel()
+        saveUserPreferences()
         wsJob?.cancel()
+        rtdbJob?.cancel()
         futuresWs.disconnect()
     }
 }

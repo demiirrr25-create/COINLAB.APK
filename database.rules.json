@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "heatmap": {
+      ".read": true,
+      ".write": false,
+      "$symbol": {
+        "$timeframe": {
+          ".read": true
+        }
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid",
+        "heatmapSettings": {
+          ".validate": "newData.hasChildren(['timeframe', 'threshold', 'lastCoin'])"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "coinlab-heatmap-functions",
+  "version": "1.0.0",
+  "description": "CoinLab Liquidation Heatmap Engine — Firebase Cloud Functions Backend",
+  "main": "index.js",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0",
+    "axios": "^1.7.0"
+  },
+  "private": true
+}

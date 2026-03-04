@@ -335,4 +335,15 @@
     <string name="liquidation_exchange_breakdown">Borsa Dağılımı</string>
     <string name="liquidation_estimated">Tahmini veri — gerçek zamanlı likidasyon verisi sınırlı</string>
     <string name="liquidation_threshold">Eşik Değeri</string>
+
+    <!-- v12.2 Liquidation Heatmap Engine -->
+    <string name="liquidation_search_hint">Sembol ara (BTC, ETH…)</string>
+    <string name="liquidation_model">Model</string>
+    <string name="liquidation_model_standard">Standart</string>
+    <string name="liquidation_model_aggressive">Agresif</string>
+    <string name="liquidation_model_conservative">Muhafazakar</string>
+    <string name="liquidation_zoom">Tam Ekran</string>
+    <string name="liquidation_max_liq">Maks. Likidasyon</string>
+    <string name="liquidation_pair">Çift</string>
+    <string name="liquidation_symbol">Sembol</string>
 </resources>
