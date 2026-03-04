@@ -56,18 +56,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.coinlab.app.R
+import com.coinlab.app.ui.components.CandlestickChart
 import com.coinlab.app.ui.components.FormatUtils
 import com.coinlab.app.ui.components.InteractiveChart
 import com.coinlab.app.ui.components.PriceChangeIndicator
@@ -276,12 +282,20 @@ fun CoinDetailScreen(
                                                         .fillMaxWidth()
                                                         .height(220.dp)
                                                 ) {
-                                                    InteractiveChart(
-                                                        prices = remember(chart) { chart.prices.map { it.second } },
-                                                        volumes = remember(chart) { chart.totalVolumes?.map { it.second } ?: emptyList() },
-                                                        showVolume = true,
-                                                        currency = uiState.currency
-                                                    )
+                                                    if (uiState.chartType == ChartType.CANDLE && chart.ohlc.isNotEmpty()) {
+                                                        CandlestickChart(
+                                                            data = remember(chart) { chart.ohlc },
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            currency = uiState.currency
+                                                        )
+                                                    } else {
+                                                        InteractiveChart(
+                                                            prices = remember(chart) { chart.prices.map { it.second } },
+                                                            volumes = remember(chart) { chart.totalVolumes?.map { it.second } ?: emptyList() },
+                                                            showVolume = true,
+                                                            currency = uiState.currency
+                                                        )
+                                                    }
                                                 }
                                             }
                                         } ?: Box(
@@ -301,17 +315,35 @@ fun CoinDetailScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Time range selector
+                                // Chart type + Time range selector
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    listOf("1" to "24S", "7" to "7G", "30" to "30G", "90" to "90G", "365" to "1Y").forEach { (days, label) ->
+                                    // Chart type toggle
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         FilterChip(
-                                            selected = uiState.selectedTimeRange == days,
-                                            onClick = { viewModel.loadMarketChart(days) },
-                                            label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                            selected = uiState.chartType == ChartType.LINE,
+                                            onClick = { if (uiState.chartType != ChartType.LINE) viewModel.toggleChartType() },
+                                            label = { Text("Çizgi", style = MaterialTheme.typography.labelSmall) }
                                         )
+                                        FilterChip(
+                                            selected = uiState.chartType == ChartType.CANDLE,
+                                            onClick = { if (uiState.chartType != ChartType.CANDLE) viewModel.toggleChartType() },
+                                            label = { Text("Mum", style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+
+                                    // Time range selector
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf("1" to "24S", "7" to "7G", "30" to "30G", "365" to "1Y").forEach { (days, label) ->
+                                            FilterChip(
+                                                selected = uiState.selectedTimeRange == days,
+                                                onClick = { viewModel.loadMarketChart(days) },
+                                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -425,8 +457,17 @@ fun CoinDetailScreen(
                             }
                         }
 
-                        // Description
-                        if (coin.description.isNotBlank()) {
+                        // Proje Hakkında
+                        val hasAboutContent = coin.description.isNotBlank() ||
+                            coin.categories.isNotEmpty() ||
+                            coin.genesisDate != null ||
+                            coin.links.homepage.any { it.isNotBlank() } ||
+                            coin.links.twitter != null ||
+                            coin.links.reddit != null ||
+                            coin.links.telegram != null ||
+                            coin.links.github.any { it.isNotBlank() }
+
+                        if (hasAboutContent) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -438,16 +479,102 @@ fun CoinDetailScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        text = stringResource(R.string.about),
+                                        text = "Proje Hakkında",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = coin.description.replace(Regex("<[^>]*>"), ""),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+
+                                    // Categories
+                                    if (coin.categories.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            coin.categories.take(5).forEach { cat ->
+                                                FilterChip(
+                                                    selected = false,
+                                                    onClick = {},
+                                                    label = { Text(cat, style = MaterialTheme.typography.labelSmall) }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Genesis date
+                                    coin.genesisDate?.let { date ->
+                                        if (date.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            StatRow("Lansman Tarihi", date)
+                                        }
+                                    }
+
+                                    // Description
+                                    if (coin.description.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        var expanded by remember { mutableStateOf(false) }
+                                        val cleanDesc = coin.description.replace(Regex("<[^>]*>"), "")
+                                        Text(
+                                            text = cleanDesc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = if (expanded) Int.MAX_VALUE else 4,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (cleanDesc.length > 200) {
+                                            Text(
+                                                text = if (expanded) "Daha az göster" else "Daha fazla göster",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = CoinLabGold,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.clickable { expanded = !expanded }
+                                            )
+                                        }
+                                    }
+
+                                    // Links
+                                    val uriHandler = LocalUriHandler.current
+                                    val hasLinks = coin.links.homepage.any { it.isNotBlank() } ||
+                                        coin.links.twitter != null || coin.links.reddit != null ||
+                                        coin.links.telegram != null || coin.links.github.any { it.isNotBlank() }
+
+                                    if (hasLinks) {
+                                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                        Text("Bağlantılar", style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        @Composable
+                                        fun LinkRow(label: String, url: String) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { try { uriHandler.openUri(url) } catch (_: Exception) {} }
+                                                    .padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(label, style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(
+                                                    text = url.removePrefix("https://").removePrefix("http://").take(30),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = CoinLabGold,
+                                                    textDecoration = TextDecoration.Underline,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+
+                                        coin.links.homepage.firstOrNull { it.isNotBlank() }?.let { LinkRow("Web Sitesi", it) }
+                                        coin.links.twitter?.let { if (it.isNotBlank()) LinkRow("Twitter/X", "https://twitter.com/$it") }
+                                        coin.links.reddit?.let { if (it.isNotBlank()) LinkRow("Reddit", it) }
+                                        coin.links.telegram?.let { if (it.isNotBlank()) LinkRow("Telegram", "https://t.me/$it") }
+                                        coin.links.github.firstOrNull { it.isNotBlank() }?.let { LinkRow("GitHub", it) }
+                                        coin.links.blockchain.firstOrNull { it.isNotBlank() }?.let { LinkRow("Blockchain", it) }
+                                    }
                                 }
                             }
                         }

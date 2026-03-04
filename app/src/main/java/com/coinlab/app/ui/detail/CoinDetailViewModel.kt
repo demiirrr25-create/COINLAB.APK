@@ -30,6 +30,7 @@ data class CoinDetailUiState(
     val error: String? = null,
     val chartError: String? = null,
     val selectedTimeRange: String = "7",
+    val chartType: ChartType = ChartType.LINE,
     val currency: String = "USD",
     val isInWatchlist: Boolean = false,
     val livePrice: Double? = null,
@@ -37,6 +38,8 @@ data class CoinDetailUiState(
     val showAlertDialog: Boolean = false,
     val alertCreated: Boolean = false
 )
+
+enum class ChartType { LINE, CANDLE }
 
 @HiltViewModel
 class CoinDetailViewModel @Inject constructor(
@@ -167,6 +170,12 @@ class CoinDetailViewModel @Inject constructor(
 
     fun retryChart() {
         loadMarketChart(_uiState.value.selectedTimeRange)
+    }
+
+    fun toggleChartType() {
+        _uiState.update {
+            it.copy(chartType = if (it.chartType == ChartType.LINE) ChartType.CANDLE else ChartType.LINE)
+        }
     }
 
     private fun connectLivePrice(symbol: String) {

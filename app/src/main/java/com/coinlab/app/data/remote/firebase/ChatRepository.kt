@@ -35,6 +35,10 @@ class ChatRepository @Inject constructor(
     private val messagesRef = database.reference.child("messages")
     private val userChatsRef = database.reference.child("user_chats")
 
+    init {
+        chatsRef.keepSynced(true)
+    }
+
     /**
      * Get or create a chat room between two users.
      */
@@ -148,7 +152,7 @@ class ChatRepository @Inject constructor(
 
         userChatsRef.child(currentUserId).addValueEventListener(listener)
         awaitClose { userChatsRef.child(currentUserId).removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         delay(3000)
         true
     }
@@ -177,7 +181,7 @@ class ChatRepository @Inject constructor(
 
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         delay(3000)
         true
     }

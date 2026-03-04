@@ -121,11 +121,12 @@ class TechnicalAnalysisViewModel @Inject constructor(
                 )
                 val ohlcData = klines.map { point ->
                     OhlcData(
-                        timestamp = (point[0] as? Number)?.toLong() ?: 0L,
+                        time = (point[0] as? Number)?.toLong() ?: 0L,
                         open = (point[1] as? String)?.toDoubleOrNull() ?: 0.0,
                         high = (point[2] as? String)?.toDoubleOrNull() ?: 0.0,
                         low = (point[3] as? String)?.toDoubleOrNull() ?: 0.0,
-                        close = (point[4] as? String)?.toDoubleOrNull() ?: 0.0
+                        close = (point[4] as? String)?.toDoubleOrNull() ?: 0.0,
+                        volume = (point[5] as? String)?.toDoubleOrNull() ?: 0.0
                     )
                 }
                 _uiState.update { it.copy(ohlcData = ohlcData, isLoading = false) }

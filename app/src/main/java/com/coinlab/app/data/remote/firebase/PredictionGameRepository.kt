@@ -37,6 +37,11 @@ class PredictionGameRepository @Inject constructor(
     private val predictionsRef = gameRef.child("predictions")
     private val leaderboardRef = gameRef.child("leaderboard")
 
+    init {
+        roundsRef.keepSynced(true)
+        leaderboardRef.keepSynced(true)
+    }
+
     /**
      * Get active prediction round (real-time).
      */
@@ -61,7 +66,7 @@ class PredictionGameRepository @Inject constructor(
 
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { delay(3000); true }
+    }.retry(3) { delay(3000); true }
 
     /**
      * Create a new prediction round.
@@ -132,7 +137,7 @@ class PredictionGameRepository @Inject constructor(
 
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { delay(3000); true }
+    }.retry(3) { delay(3000); true }
 
     /**
      * Complete a round and calculate results.
@@ -216,7 +221,7 @@ class PredictionGameRepository @Inject constructor(
 
         leaderboardRef.addValueEventListener(listener)
         awaitClose { leaderboardRef.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { delay(3000); true }
+    }.retry(3) { delay(3000); true }
 
     fun getCurrentUserId(): String = auth.currentUser?.uid ?: ""
     fun getCurrentUserName(): String = auth.currentUser?.displayName ?: "Anonim"

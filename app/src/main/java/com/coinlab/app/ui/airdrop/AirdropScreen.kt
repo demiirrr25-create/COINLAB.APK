@@ -91,13 +91,29 @@ fun AirdropScreen(
                 }
             }
 
-            // Filtered airdrops
-            val filtered = when (uiState.selectedFilter) {
-                AirdropFilter.ALL -> uiState.airdrops
-                AirdropFilter.ACTIVE -> uiState.airdrops.filter { it.status == AirdropStatus.ACTIVE }
-                AirdropFilter.UPCOMING -> uiState.airdrops.filter { it.status == AirdropStatus.UPCOMING }
-                AirdropFilter.ENDED -> uiState.airdrops.filter { it.status == AirdropStatus.ENDED || it.status == AirdropStatus.CONFIRMED }
+            // Exchange Filter
+            item {
+                var selectedExchange by remember { mutableStateOf("Tümü") }
+                val exchanges = listOf("Tümü", "Binance", "Coinbase", "OKX", "Bybit", "KuCoin", "Gate.io", "Bitget", "MEXC", "Topluluk")
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    exchanges.forEach { exchange ->
+                        FilterChip(
+                            selected = selectedExchange == exchange,
+                            onClick = {
+                                selectedExchange = exchange
+                                viewModel.selectExchange(exchange)
+                            },
+                            label = { Text(exchange, fontSize = 12.sp) }
+                        )
+                    }
+                }
             }
+
+            // Filtered airdrops
+            val filtered = viewModel.filteredAirdrops
 
             if (filtered.isEmpty()) {
                 item {

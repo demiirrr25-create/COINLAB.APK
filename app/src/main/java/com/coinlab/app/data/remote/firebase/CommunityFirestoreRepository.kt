@@ -79,7 +79,7 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         val code = (cause as? FirebaseFirestoreException)?.code
         val isRetryable = cause is FirebaseFirestoreException && code in listOf(
             FirebaseFirestoreException.Code.UNAVAILABLE,
@@ -116,7 +116,7 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         val code = (cause as? FirebaseFirestoreException)?.code
         val isRetryable = cause is FirebaseFirestoreException && code in listOf(
             FirebaseFirestoreException.Code.UNAVAILABLE,
@@ -250,7 +250,7 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         val code = (cause as? FirebaseFirestoreException)?.code
         val isRetryable = cause is FirebaseFirestoreException && code in listOf(
             FirebaseFirestoreException.Code.UNAVAILABLE,
@@ -318,7 +318,7 @@ class CommunityFirestoreRepository @Inject constructor(
         }
 
         awaitClose { listener.remove() }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         val code = (cause as? FirebaseFirestoreException)?.code
         val isRetryable = cause is FirebaseFirestoreException && code in listOf(
             FirebaseFirestoreException.Code.UNAVAILABLE,

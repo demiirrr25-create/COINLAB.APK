@@ -5,6 +5,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
+    <!-- Scaled-down flask group: 78% size, centered -->
+    <group
+        android:scaleX="0.78"
+        android:scaleY="0.78"
+        android:pivotX="54"
+        android:pivotY="54">
+
     <!-- === BACKGROUND DEPTH LAYERS === -->
     <path
         android:fillColor="#F7931A"
@@ -204,4 +211,5 @@
         android:fillAlpha="0.18"
         android:pathData="M36,82 Q46,85 54,85 Q62,85 72,82 Q66,84 54,84.5 Q42,84 36,82 Z" />
 
+    </group>
 </vector>

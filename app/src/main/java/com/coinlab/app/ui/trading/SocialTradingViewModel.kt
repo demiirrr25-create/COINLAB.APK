@@ -37,10 +37,30 @@ class SocialTradingViewModel @Inject constructor(
 
     private fun loadSignals() {
         viewModelScope.launch {
-            repository.getSignals().collect { signals ->
-                _uiState.update { it.copy(signals = signals, isLoading = false) }
+            try {
+                repository.getSignals().collect { signals ->
+                    _uiState.update { it.copy(signals = signals, isLoading = false, error = null) }
+                }
+            } catch (e: Exception) {
+                // Realtime listener failed — try one-shot fetch
+                try {
+                    val signals = repository.getSignalsOnce()
+                    _uiState.update { it.copy(signals = signals, isLoading = false, error = null) }
+                } catch (_: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "Sinyaller yüklenemedi. Firebase RTDB kurallarını kontrol edin."
+                        )
+                    }
+                }
             }
         }
+    }
+
+    fun retryLoading() {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        loadSignals()
     }
 
     fun toggleLike(signalId: String) {

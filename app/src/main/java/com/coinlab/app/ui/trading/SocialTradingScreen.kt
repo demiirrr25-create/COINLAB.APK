@@ -95,6 +95,34 @@ fun SocialTradingScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = CoinLabGreen)
                 }
+            } else if (uiState.error != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                        Icon(
+                            Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = CoinLabGold.copy(alpha = 0.7f),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            uiState.error ?: "Bilinmeyen hata",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 14.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.retryLoading() },
+                            colors = ButtonDefaults.buttonColors(containerColor = CoinLabGreen),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Tekrar Dene")
+                        }
+                    }
+                }
             } else if (filteredSignals.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -424,13 +424,30 @@ class CoinRepositoryImpl @Inject constructor(
                     Pair(timestamp, volume)
                 } else null
             }
+            val ohlc = klines.mapNotNull { candle ->
+                if (candle.size >= 6) {
+                    val timestamp = (candle[0] as? Number)?.toLong() ?: return@mapNotNull null
+                    val open = (candle[1] as? String)?.toDoubleOrNull()
+                        ?: (candle[1] as? Number)?.toDouble() ?: return@mapNotNull null
+                    val high = (candle[2] as? String)?.toDoubleOrNull()
+                        ?: (candle[2] as? Number)?.toDouble() ?: return@mapNotNull null
+                    val low = (candle[3] as? String)?.toDoubleOrNull()
+                        ?: (candle[3] as? Number)?.toDouble() ?: return@mapNotNull null
+                    val close = (candle[4] as? String)?.toDoubleOrNull()
+                        ?: (candle[4] as? Number)?.toDouble() ?: return@mapNotNull null
+                    val vol = (candle[5] as? String)?.toDoubleOrNull()
+                        ?: (candle[5] as? Number)?.toDouble() ?: 0.0
+                    com.coinlab.app.domain.model.OhlcData(timestamp, open, high, low, close, vol)
+                } else null
+            }
             if (prices.isEmpty()) {
                 emit(Result.failure(Exception("Binance grafik verisi boş")))
             } else {
                 emit(Result.success(MarketChart(
                     prices = prices,
                     marketCaps = emptyList(),
-                    totalVolumes = volumes
+                    totalVolumes = volumes,
+                    ohlc = ohlc
                 )))
             }
         } catch (e: Exception) {

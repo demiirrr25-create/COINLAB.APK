@@ -16,11 +16,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * v9.5 — Social Trading Signal Repository
+ * v10.0 — Social Trading Signal Repository
  *
  * Firebase RTDB-based trading signals.
  * Structure:
  *   trading_signals/{signalId} → TradingSignal
+ *
+ * IMPORTANT: Firebase RTDB Security Rules must allow read access:
+ *   "trading_signals": { ".read": true, ".write": "auth != null", ".indexOn": ["timestamp"] }
  */
 @Singleton
 class TradingSignalRepository @Inject constructor(
@@ -28,6 +31,11 @@ class TradingSignalRepository @Inject constructor(
     private val auth: FirebaseAuth
 ) {
     private val signalsRef = database.reference.child("trading_signals")
+
+    init {
+        // Keep data synced for offline support and faster reads
+        signalsRef.keepSynced(true)
+    }
 
     /**
      * Create a new trading signal.
@@ -86,15 +94,35 @@ class TradingSignalRepository @Inject constructor(
             }
 
             override fun onCancelled(error: DatabaseError) {
-                close(error.toException())
+                // Emit empty list with error info instead of closing flow
+                trySend(emptyList())
             }
         }
 
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
-        delay(3000)
+    }.retry(3) { cause ->
+        delay(2000)
         true
+    }
+
+    /**
+     * One-shot fetch for signals (fallback when realtime listener fails).
+     */
+    suspend fun getSignalsOnce(): List<TradingSignal> {
+        return try {
+            val snapshot = signalsRef.orderByChild("timestamp").get().await()
+            val signals = mutableListOf<TradingSignal>()
+            for (child in snapshot.children) {
+                try {
+                    child.getValue(TradingSignal::class.java)?.let { signals.add(it) }
+                } catch (_: Exception) { }
+            }
+            signals.sortByDescending { it.timestamp }
+            signals
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     /**

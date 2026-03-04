@@ -58,6 +58,11 @@ class CommunityRealtimeRepository @Inject constructor(
     private val commentsRef = database.reference.child("community").child("comments")
     private val channelsRef = database.reference.child("community").child("channels")
 
+    init {
+        postsRef.keepSynced(true)
+        channelsRef.keepSynced(true)
+    }
+
     // ─── POSTS ──────────────────────────────────────────────────────────
 
     /**
@@ -97,7 +102,7 @@ class CommunityRealtimeRepository @Inject constructor(
 
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         android.util.Log.w("CommunityRTDB", "Posts listener retrying after: ${cause.message}")
         delay(3000)
         true
@@ -129,7 +134,7 @@ class CommunityRealtimeRepository @Inject constructor(
 
         query.addValueEventListener(listener)
         awaitClose { query.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         delay(3000)
         true
     }
@@ -271,7 +276,7 @@ class CommunityRealtimeRepository @Inject constructor(
 
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         delay(3000)
         true
     }
@@ -354,7 +359,7 @@ class CommunityRealtimeRepository @Inject constructor(
 
         channelsRef.addValueEventListener(listener)
         awaitClose { channelsRef.removeEventListener(listener) }
-    }.retry(Long.MAX_VALUE) { cause ->
+    }.retry(3) { cause ->
         delay(3000)
         true
     }
