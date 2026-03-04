@@ -346,4 +346,9 @@
     <string name="liquidation_max_liq">Maks. Likidasyon</string>
     <string name="liquidation_pair">Çift</string>
     <string name="liquidation_symbol">Sembol</string>
+
+    <!-- v12.3 CoinGlass-Style Liquidation Map -->
+    <string name="liquidation_extreme_zone">Aşırı Bölge</string>
+    <string name="liquidation_total_long">Toplam Long</string>
+    <string name="liquidation_total_short">Toplam Short</string>
 </resources>

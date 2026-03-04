@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * v12.2 — CoinGlass-Grade Liquidation Heatmap ViewModel
+ * v12.3 — CoinGlass-Style Open Interest Liquidation Map ViewModel
  *
  * Architecture:
  *   - Firebase RTDB listener for real-time heatmap data (backend-computed)
@@ -63,6 +63,7 @@ sealed class ChartCommand {
     data class SetPrecision(val precision: Int, val minMove: Double) : ChartCommand()
     data class SetThreshold(val value: Float) : ChartCommand()
     data class SetModel(val model: String) : ChartCommand()
+    data class SetLongShortTotals(val totalLongUsd: Double, val totalShortUsd: Double) : ChartCommand()
 }
 
 @HiltViewModel
@@ -290,14 +291,22 @@ class LiquidationMapViewModel @Inject constructor(
         val heatmapList = data.heatmapBuckets.map { b ->
             mapOf(
                 "priceLevel" to b.priceLevel,
+                "priceLow" to b.priceLow,
+                "priceHigh" to b.priceHigh,
                 "longUsd" to b.longLiquidationUsd,
                 "shortUsd" to b.shortLiquidationUsd,
-                "totalUsd" to b.totalLiquidationUsd
+                "totalUsd" to b.totalLiquidationUsd,
+                "eventCount" to b.eventCount
             )
         }
         val hJson = gson.toJson(heatmapList)
         _uiState.update { it.copy(heatmapJson = hJson) }
         _chartCommands.tryEmit(ChartCommand.SetHeatmap(hJson))
+
+        // Emit Long/Short USD totals for header display
+        val tLong = data.heatmapBuckets.sumOf { it.longLiquidationUsd }
+        val tShort = data.heatmapBuckets.sumOf { it.shortLiquidationUsd }
+        _chartCommands.tryEmit(ChartCommand.SetLongShortTotals(tLong, tShort))
 
         if (data.markPrice > 0) {
             _chartCommands.tryEmit(ChartCommand.SetMarkPrice(data.markPrice))

@@ -53,7 +53,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════
-// v12.2 — CoinGlass-Grade Liquidation Heatmap Engine
+// v12.3 — CoinGlass-Style Open Interest Liquidation Map
 // Search bar, threshold slider, model dropdown, zoom, gradient legend
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -184,7 +184,7 @@ fun LiquidationMapScreen(
 
                 // Professional WebView Chart
                 item {
-                    val chartHeight = if (uiState.isFullscreen) 600.dp else 420.dp
+                    val chartHeight = if (uiState.isFullscreen) 640.dp else 480.dp
                     LiquidationChartWebView(
                         viewModel = viewModel,
                         modifier = Modifier
@@ -309,6 +309,7 @@ private fun LiquidationChartWebView(
                 is ChartCommand.SetPrecision -> "setPricePrecision(${cmd.precision}, ${cmd.minMove})"
                 is ChartCommand.SetThreshold -> "setThreshold(${cmd.value})"
                 is ChartCommand.SetModel -> "setModel('${cmd.model}')"
+                is ChartCommand.SetLongShortTotals -> "setLongShortTotals(${cmd.totalLongUsd}, ${cmd.totalShortUsd})"
             }
             wv.post { wv.evaluateJavascript(js, null) }
         }
@@ -956,7 +957,7 @@ private fun GradientScaleLegend() {
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            Color(0xFF4B0082),  // Purple — low
+                            Color(0xFF1A237E),  // Deep blue — low
                             Color(0xFF0064C8),  // Blue
                             Color(0xFF00C853),  // Green
                             Color(0xFFFFC107),  // Yellow
