@@ -14,6 +14,9 @@ interface PriceAlertDao {
     @Query("SELECT * FROM price_alerts ORDER BY createdAt DESC")
     fun getAllAlerts(): Flow<List<PriceAlertEntity>>
 
+    @Query("SELECT * FROM price_alerts ORDER BY createdAt DESC")
+    suspend fun getAllAlertsList(): List<PriceAlertEntity>
+
     @Query("SELECT * FROM price_alerts WHERE isActive = 1 AND isTriggered = 0")
     suspend fun getActiveAlerts(): List<PriceAlertEntity>
 

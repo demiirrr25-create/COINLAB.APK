@@ -96,7 +96,7 @@ fun StakingScreen(
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "6 borsanın ilk 15 staking coin'ine verdiği APR'ları karşılaştırın",
+                                text = "6 borsanın ilk 25 staking coin'ine verdiği APR'ları karşılaştırın",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.8f)
                             )

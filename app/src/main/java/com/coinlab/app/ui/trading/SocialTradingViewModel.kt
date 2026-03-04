@@ -32,6 +32,7 @@ class SocialTradingViewModel @Inject constructor(
 
     init {
         loadSignals()
+        viewModelScope.launch { repository.cleanupExpiredSignals() }
     }
 
     private fun loadSignals() {

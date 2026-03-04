@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,9 +36,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -44,6 +51,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -220,6 +233,32 @@ fun PriceAlertsScreen(
                 }
             }
         }
+
+        FloatingActionButton(
+            onClick = { viewModel.showCreateDialog() },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Yeni Uyarı")
+        }
+
+        if (uiState.showCreateDialog) {
+            CreateAlertFromListDialog(
+                onDismiss = { viewModel.hideCreateDialog() },
+                onConfirm = { coinId, coinSymbol, coinName, coinImage, targetPrice, isAbove ->
+                    viewModel.createAlert(
+                        coinId = coinId,
+                        coinSymbol = coinSymbol,
+                        coinName = coinName,
+                        coinImage = coinImage,
+                        targetPrice = targetPrice,
+                        isAbove = isAbove
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -330,4 +369,97 @@ private fun AlertItem(
             }
         }
     }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateAlertFromListDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (coinId: String, coinSymbol: String, coinName: String, coinImage: String, targetPrice: Double, isAbove: Boolean) -> Unit
+) {
+    var coinIdText by remember { mutableStateOf("") }
+    var coinNameText by remember { mutableStateOf("") }
+    var coinSymbolText by remember { mutableStateOf("") }
+    var targetPriceText by remember { mutableStateOf("") }
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    val options = listOf("Üstüne Çıkınca", "Altına Düşünce")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Yeni Fiyat Uyarısı") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Coin bilgilerini girin ve hedef fiyat belirleyin.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = coinIdText,
+                    onValueChange = { coinIdText = it.lowercase().trim() },
+                    label = { Text("Coin ID (ör: bitcoin)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = coinNameText,
+                    onValueChange = { coinNameText = it },
+                    label = { Text("Coin Adı (ör: Bitcoin)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = coinSymbolText,
+                    onValueChange = { coinSymbolText = it.uppercase().trim() },
+                    label = { Text("Sembol (ör: BTC)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = selectedIndex == index,
+                            onClick = { selectedIndex = index },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = targetPriceText,
+                    onValueChange = { targetPriceText = it },
+                    label = { Text("Hedef Fiyat (USD)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            val isValid = coinIdText.isNotBlank() && coinNameText.isNotBlank() &&
+                coinSymbolText.isNotBlank() && targetPriceText.toDoubleOrNull() != null &&
+                targetPriceText.toDoubleOrNull()!! > 0
+            Button(
+                onClick = {
+                    onConfirm(
+                        coinIdText, coinSymbolText, coinNameText, "",
+                        targetPriceText.toDouble(), selectedIndex == 0
+                    )
+                },
+                enabled = isValid
+            ) {
+                Text("Uyarı Oluştur")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
 }

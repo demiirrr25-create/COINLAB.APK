@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.cache.BinanceTickerCache
+import com.google.firebase.database.FirebaseDatabase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class StakingCoin(
@@ -46,7 +48,8 @@ enum class StakingSortBy {
 @HiltViewModel
 class StakingViewModel @Inject constructor(
     private val tickerCache: BinanceTickerCache,
-    private val coinRegistry: DynamicCoinRegistry
+    private val coinRegistry: DynamicCoinRegistry,
+    private val database: FirebaseDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StakingUiState())
@@ -115,6 +118,47 @@ class StakingViewModel @Inject constructor(
         "algorand" to mapOf(
             "Binance" to (4.0 to 6.5), "Coinbase" to (3.5 to 5.5), "Kraken" to (4.0 to 6.0),
             "Bybit" to (4.5 to 7.0), "OKX" to (4.0 to 6.2), "KuCoin" to (4.2 to 6.5)
+        ),
+        // v9.6 — 10 yeni coin
+        "chainlink" to mapOf(
+            "Binance" to (3.5 to 5.8), "Coinbase" to (3.0 to 4.5), "Kraken" to (3.2 to 5.0),
+            "Bybit" to (4.0 to 6.0), "OKX" to (3.5 to 5.5), "KuCoin" to (3.8 to 5.8)
+        ),
+        "uniswap" to mapOf(
+            "Binance" to (2.5 to 4.5), "Coinbase" to (2.0 to 3.8), "Kraken" to (2.2 to 4.0),
+            "Bybit" to (3.0 to 5.0), "OKX" to (2.8 to 4.5), "KuCoin" to (2.5 to 4.2)
+        ),
+        "aave" to mapOf(
+            "Binance" to (4.0 to 6.5), "Coinbase" to (3.5 to 5.0), "Kraken" to (3.8 to 5.5),
+            "Bybit" to (4.5 to 7.0), "OKX" to (4.0 to 6.0), "KuCoin" to (4.2 to 6.5)
+        ),
+        "the-graph" to mapOf(
+            "Binance" to (8.0 to 12.0), "Coinbase" to (6.5 to 9.5), "Kraken" to (7.0 to 10.0),
+            "Bybit" to (9.0 to 13.0), "OKX" to (8.0 to 11.0), "KuCoin" to (8.5 to 12.5)
+        ),
+        "render-token" to mapOf(
+            "Binance" to (5.0 to 8.0), "Coinbase" to (4.0 to 6.5), "Kraken" to (4.5 to 7.0),
+            "Bybit" to (5.5 to 8.5), "OKX" to (5.0 to 7.5), "KuCoin" to (5.2 to 8.0)
+        ),
+        "arbitrum" to mapOf(
+            "Binance" to (4.5 to 7.0), "Coinbase" to (3.5 to 5.5), "Kraken" to (4.0 to 6.0),
+            "Bybit" to (5.0 to 7.5), "OKX" to (4.5 to 6.8), "KuCoin" to (4.8 to 7.2)
+        ),
+        "optimism" to mapOf(
+            "Binance" to (4.0 to 6.5), "Coinbase" to (3.5 to 5.5), "Kraken" to (3.8 to 6.0),
+            "Bybit" to (4.5 to 7.0), "OKX" to (4.0 to 6.2), "KuCoin" to (4.2 to 6.8)
+        ),
+        "lido-dao" to mapOf(
+            "Binance" to (3.0 to 5.0), "Coinbase" to (2.5 to 4.0), "Kraken" to (2.8 to 4.5),
+            "Bybit" to (3.5 to 5.5), "OKX" to (3.0 to 5.0), "KuCoin" to (3.2 to 5.2)
+        ),
+        "rocket-pool" to mapOf(
+            "Binance" to (3.5 to 5.5), "Coinbase" to (3.0 to 4.5), "Kraken" to (3.2 to 5.0),
+            "Bybit" to (4.0 to 6.0), "OKX" to (3.5 to 5.5), "KuCoin" to (3.8 to 5.8)
+        ),
+        "ondo-finance" to mapOf(
+            "Binance" to (6.0 to 9.5), "Coinbase" to (5.0 to 7.5), "Kraken" to (5.5 to 8.0),
+            "Bybit" to (6.5 to 10.0), "OKX" to (6.0 to 8.5), "KuCoin" to (6.2 to 9.5)
         )
     )
 
@@ -129,6 +173,27 @@ class StakingViewModel @Inject constructor(
 
     init {
         loadStakingData()
+        pushStakingRatesToFirebase()
+    }
+
+    /**
+     * Push hardcoded staking rates to Firebase RTDB for future remote updates
+     */
+    private fun pushStakingRatesToFirebase() {
+        viewModelScope.launch {
+            try {
+                val ref = database.reference.child("staking_rates")
+                val snapshot = ref.get().await()
+                if (!snapshot.exists()) {
+                    val data = stakingRates.mapValues { (_, exchangeMap) ->
+                        exchangeMap.mapValues { (_, pair) ->
+                            mapOf("min" to pair.first, "max" to pair.second)
+                        }
+                    }
+                    ref.setValue(data).await()
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     fun loadStakingData() {

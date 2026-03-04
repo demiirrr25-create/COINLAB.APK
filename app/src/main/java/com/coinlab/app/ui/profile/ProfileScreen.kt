@@ -87,7 +87,6 @@ fun ProfileScreen(
     onSettingsClick: () -> Unit = {},
     onAlertsClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onWalletClick: () -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
@@ -362,65 +361,6 @@ fun ProfileScreen(
                         subtitle = stringResource(R.string.settings_desc),
                         iconTint = CoinLabGreen,
                         onClick = onSettingsClick
-                    )
-                }
-            }
-        }
-
-        // Wallet Section
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Cüzdan",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = CoinLabAqua,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-
-        item {
-            ElevatedCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clickable(onClick = onWalletClick),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CoinLabAqua.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "\uD83D\uDCB0", fontSize = 22.sp) // money bag
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Cüzdan Yönetimi",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "MetaMask, Binance ve diğer cüzdanları bağla",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = CoinLabAqua,
-                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

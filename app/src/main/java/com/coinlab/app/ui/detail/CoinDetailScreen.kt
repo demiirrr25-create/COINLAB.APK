@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,13 +37,26 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +86,25 @@ fun CoinDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currency = uiState.currency.lowercase()
+    val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(uiState.alertCreated) {
+        if (uiState.alertCreated) {
+            snackbarHostState.showSnackbar("Fiyat uyarısı oluşturuldu!")
+        }
+    }
+
+    if (uiState.showAlertDialog) {
+        CreatePriceAlertDialog(
+            coinName = uiState.coinDetail?.name ?: "",
+            currentPrice = uiState.livePrice ?: uiState.coinDetail?.currentPrice?.get(uiState.currency.lowercase()) ?: 0.0,
+            currency = uiState.currency,
+            onDismiss = viewModel::hideAlertDialog,
+            onConfirm = { price, isAbove -> viewModel.createAlert(price, isAbove) }
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
@@ -300,7 +333,7 @@ fun CoinDetailScreen(
                                 Text(stringResource(R.string.add_to_portfolio))
                             }
                             FilledTonalButton(
-                                onClick = { /* TODO: Price alert dialog */ },
+                                onClick = { viewModel.showAlertDialog() },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.Filled.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -425,6 +458,11 @@ fun CoinDetailScreen(
             }
         }
     }
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter)
+    )
+    }
 }
 
 @Composable
@@ -467,4 +505,79 @@ private fun PriceChangeRow(label: String, percentage: Double) {
             showBackground = true
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreatePriceAlertDialog(
+    coinName: String,
+    currentPrice: Double,
+    currency: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Boolean) -> Unit
+) {
+    var targetPriceText by remember { mutableStateOf("") }
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    val isAbove = selectedIndex == 0
+    val options = listOf("Üstüne Çıkınca", "Altına Düşünce")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Fiyat Uyarısı Oluştur") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "$coinName - Güncel: ${FormatUtils.formatPrice(currentPrice)} ${currency.uppercase()}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = selectedIndex == index,
+                            onClick = { selectedIndex = index },
+                            shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = targetPriceText,
+                    onValueChange = { targetPriceText = it },
+                    label = { Text("Hedef Fiyat (${currency.uppercase()})") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val targetPrice = targetPriceText.toDoubleOrNull()
+                if (targetPrice != null) {
+                    val diff = if (isAbove) targetPrice - currentPrice else currentPrice - targetPrice
+                    val pct = if (currentPrice > 0) (diff / currentPrice * 100) else 0.0
+                    Text(
+                        text = if (diff > 0) "Fark: +%.2f%%".format(pct) else "Fark: %.2f%%".format(pct),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (diff > 0) CoinLabGreen else CoinLabRed
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    targetPriceText.toDoubleOrNull()?.let { onConfirm(it, isAbove) }
+                },
+                enabled = targetPriceText.toDoubleOrNull() != null && targetPriceText.toDoubleOrNull()!! > 0
+            ) {
+                Text("Uyarı Oluştur")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
 }

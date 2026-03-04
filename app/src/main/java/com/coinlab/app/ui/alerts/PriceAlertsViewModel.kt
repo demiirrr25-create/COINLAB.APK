@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.local.entity.PriceAlertEntity
 import com.coinlab.app.data.preferences.UserPreferences
+import com.coinlab.app.data.remote.firebase.PriceAlertFirebaseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +31,8 @@ enum class AlertTab { ALL, ACTIVE, TRIGGERED }
 @HiltViewModel
 class PriceAlertsViewModel @Inject constructor(
     private val priceAlertDao: PriceAlertDao,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val firebaseRepository: PriceAlertFirebaseRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PriceAlertsUiState())
@@ -82,12 +84,15 @@ class PriceAlertsViewModel @Inject constructor(
                 isAbove = isAbove
             )
             priceAlertDao.insert(entity)
+            _uiState.update { it.copy(showCreateDialog = false) }
+            try { firebaseRepository.syncAllToFirebase() } catch (_: Exception) {}
         }
     }
 
     fun deleteAlert(alertId: Long) {
         viewModelScope.launch {
             priceAlertDao.deleteById(alertId)
+            try { firebaseRepository.deleteAlertFromFirebase(alertId) } catch (_: Exception) {}
         }
     }
 

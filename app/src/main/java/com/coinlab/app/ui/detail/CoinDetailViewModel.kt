@@ -3,6 +3,8 @@ package com.coinlab.app.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.coinlab.app.data.local.dao.PriceAlertDao
+import com.coinlab.app.data.local.entity.PriceAlertEntity
 import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.data.remote.websocket.SharedWebSocketManager
 import com.coinlab.app.domain.model.CoinDetail
@@ -31,7 +33,9 @@ data class CoinDetailUiState(
     val currency: String = "USD",
     val isInWatchlist: Boolean = false,
     val livePrice: Double? = null,
-    val livePriceChange: Double? = null
+    val livePriceChange: Double? = null,
+    val showAlertDialog: Boolean = false,
+    val alertCreated: Boolean = false
 )
 
 @HiltViewModel
@@ -39,7 +43,8 @@ class CoinDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val coinRepository: CoinRepository,
     private val userPreferences: UserPreferences,
-    private val sharedWebSocketManager: SharedWebSocketManager
+    private val sharedWebSocketManager: SharedWebSocketManager,
+    private val priceAlertDao: PriceAlertDao
 ) : ViewModel() {
 
     private val coinId: String = savedStateHandle.get<String>("coinId") ?: ""
@@ -205,6 +210,35 @@ class CoinDetailViewModel @Inject constructor(
                 } else {
                     coinRepository.addToWatchlist(coinId)
                 }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+            }
+        }
+    }
+
+    fun showAlertDialog() {
+        _uiState.update { it.copy(showAlertDialog = true, alertCreated = false) }
+    }
+
+    fun hideAlertDialog() {
+        _uiState.update { it.copy(showAlertDialog = false) }
+    }
+
+    fun createAlert(targetPrice: Double, isAbove: Boolean) {
+        val coin = _uiState.value.coinDetail ?: return
+        viewModelScope.launch {
+            try {
+                val entity = PriceAlertEntity(
+                    coinId = coin.id,
+                    coinSymbol = coin.symbol,
+                    coinName = coin.name,
+                    coinImage = coin.image,
+                    targetPrice = targetPrice,
+                    currency = _uiState.value.currency,
+                    isAbove = isAbove
+                )
+                priceAlertDao.insert(entity)
+                _uiState.update { it.copy(showAlertDialog = false, alertCreated = true) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }

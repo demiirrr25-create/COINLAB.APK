@@ -69,7 +69,7 @@ import com.coinlab.app.ui.profile.ProfileScreen
 import com.coinlab.app.ui.search.SearchScreen
 import com.coinlab.app.ui.settings.SettingsScreen
 import com.coinlab.app.ui.staking.StakingScreen
-import com.coinlab.app.ui.wallet.WalletScreen
+import com.coinlab.app.ui.trading.SocialTradingScreen
 import com.coinlab.app.ui.web3.Web3Screen
 import com.coinlab.app.ui.ai.AiAssistantScreen
 import com.coinlab.app.ui.chat.ChatListScreen
@@ -319,9 +319,6 @@ fun CoinLabNavHost(
                     onSearchClick = {
                         navController.navigate(Screen.Search.route)
                     },
-                    onWalletClick = {
-                        navController.navigate(Screen.Wallet.route)
-                    },
                     onLogout = {
                         authViewModel.logout()
                         navController.navigate(Screen.Login.route) {
@@ -449,21 +446,6 @@ fun CoinLabNavHost(
             composable(Screen.Staking.route) {
                 StakingScreen(
                     onBackClick = { navController.popBackStack() }
-                )
-            }
-
-            // Wallet
-            composable(
-                Screen.Wallet.route,
-                enterTransition = {
-                    slideInVertically(tween(350)) { it } + fadeIn(tween(350))
-                },
-                exitTransition = {
-                    slideOutVertically(tween(300)) { it } + fadeOut(tween(300))
-                }
-            ) {
-                WalletScreen(
-                    onBack = { navController.popBackStack() }
                 )
             }
 

@@ -113,4 +113,21 @@ class TradingSignalRepository @Inject constructor(
     }
 
     fun getCurrentUserId(): String = auth.currentUser?.uid ?: ""
+
+    /**
+     * v9.6 — Mark signals older than 24 hours as "expired".
+     * Called on each getSignals() fetch or manually.
+     */
+    suspend fun cleanupExpiredSignals() {
+        try {
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            val snapshot = signalsRef.orderByChild("timestamp").endAt(cutoff.toDouble()).get().await()
+            for (child in snapshot.children) {
+                val status = child.child("status").getValue(String::class.java)
+                if (status == "active") {
+                    child.ref.child("status").setValue("expired").await()
+                }
+            }
+        } catch (_: Exception) { }
+    }
 }

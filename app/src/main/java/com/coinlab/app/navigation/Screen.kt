@@ -25,7 +25,6 @@ sealed class Screen(val route: String) {
     data object Airdrop : Screen("airdrop")
     data object Profile : Screen("profile")
     data object Staking : Screen("staking")
-    data object Wallet : Screen("wallet")
 
     // v9.5 — New feature screens
     data object AiAssistant : Screen("ai_assistant")
