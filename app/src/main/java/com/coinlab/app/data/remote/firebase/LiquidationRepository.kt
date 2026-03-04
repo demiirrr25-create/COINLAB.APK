@@ -17,13 +17,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * v12.2 — CoinGlass-Grade Liquidation Repository
+ * v12.4 — Dual Layer Liquidation Repository
  *
  * Hybrid architecture:
  *   - Firebase Cloud Functions compute heatmap data (backend)
  *   - Firebase RTDB provides real-time data stream to mobile
  *   - Binance REST API for kline chart data (direct)
  *   - Firebase Auth for user preferences
+ *   - recentLiquidations used for Layer B spike rendering
  *
  * RTDB paths:
  *   /heatmap/{symbol}/{timeframe}  — pre-computed heatmap data

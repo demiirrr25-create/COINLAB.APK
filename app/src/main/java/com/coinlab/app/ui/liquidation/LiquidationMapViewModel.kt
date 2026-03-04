@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.remote.firebase.*
+import com.coinlab.app.data.remote.websocket.FuturesLiquidation
 import com.coinlab.app.data.remote.websocket.FuturesKlineUpdate
 import com.coinlab.app.data.remote.websocket.FuturesWebSocketClient
 import com.coinlab.app.data.remote.websocket.FuturesWsEvent
@@ -23,13 +24,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * v12.3 — CoinGlass-Style Open Interest Liquidation Map ViewModel
+ * v12.4 — Dual Layer Liquidation Map ViewModel
  *
  * Architecture:
- *   - Firebase RTDB listener for real-time heatmap data (backend-computed)
- *   - Binance Futures WebSocket for real-time kline/mark price (<500ms)
+ *   - Layer A: Open Interest Cluster (RTDB heatmap buckets)
+ *   - Layer B: Realized Liquidation Spikes (WS forceOrder + RTDB history)
+ *   - Binance Futures WebSocket for kline/mark price/liquidation events
  *   - Cloud Function callable for initial data load
- *   - User preferences saved to Firebase RTDB
+ *   - Debug mode with render stats
  *
  * Timeframes: 24H, 48H, 1W, 1M, 3M
  * Models: Standard, Aggressive, Conservative
@@ -51,7 +53,8 @@ data class LiquidationUiState(
     val heatmapJson: String = "",
     val markPrice: Double = 0.0,
     val wsConnected: Boolean = false,
-    val isFullscreen: Boolean = false
+    val isFullscreen: Boolean = false,
+    val debugMode: Boolean = false
 )
 
 /** JS evaluation commands sent to WebView */
@@ -64,6 +67,9 @@ sealed class ChartCommand {
     data class SetThreshold(val value: Float) : ChartCommand()
     data class SetModel(val model: String) : ChartCommand()
     data class SetLongShortTotals(val totalLongUsd: Double, val totalShortUsd: Double) : ChartCommand()
+    data class SetLiquidationSpikes(val json: String) : ChartCommand()
+    data class AddLiquidationSpike(val json: String) : ChartCommand()
+    data class SetDebugMode(val enabled: Boolean) : ChartCommand()
 }
 
 @HiltViewModel
@@ -85,6 +91,8 @@ class LiquidationMapViewModel @Inject constructor(
     private val gson = Gson()
     private var wsJob: Job? = null
     private var rtdbJob: Job? = null
+    private val recentLiqSpikes = mutableListOf<Map<String, Any>>()
+    private val MAX_SPIKE_BUFFER = 500
 
     val availableCoins = listOf(
         "BTC", "ETH", "SOL", "BNB", "XRP",
@@ -161,6 +169,12 @@ class LiquidationMapViewModel @Inject constructor(
         _uiState.update { it.copy(isFullscreen = !it.isFullscreen) }
     }
 
+    fun toggleDebugMode() {
+        val newMode = !_uiState.value.debugMode
+        _uiState.update { it.copy(debugMode = newMode) }
+        _chartCommands.tryEmit(ChartCommand.SetDebugMode(newMode))
+    }
+
     fun refresh() {
         _uiState.update { it.copy(isRefreshing = true) }
         loadData()
@@ -183,6 +197,17 @@ class LiquidationMapViewModel @Inject constructor(
         if (state.markPrice > 0) {
             _chartCommands.tryEmit(ChartCommand.SetMarkPrice(state.markPrice))
         }
+
+        // Send cached spike data
+        if (recentLiqSpikes.isNotEmpty()) {
+            _chartCommands.tryEmit(ChartCommand.SetLiquidationSpikes(gson.toJson(recentLiqSpikes)))
+        }
+
+        // Send debug state
+        if (state.debugMode) {
+            _chartCommands.tryEmit(ChartCommand.SetDebugMode(true))
+        }
+
         startWebSocket()
     }
 
@@ -199,11 +224,13 @@ class LiquidationMapViewModel @Inject constructor(
                 val heatmapJob = launch { loadHeatmapData(coin, tf) }
                 val oiJob = launch { loadOIHistory(coin) }
                 val lsJob = launch { loadLSHistory(coin) }
+                val spikeJob = launch { loadHistoricalLiquidations(coin) }
 
                 klineJob.join()
                 heatmapJob.join()
                 oiJob.join()
                 lsJob.join()
+                spikeJob.join()
 
                 _uiState.update { it.copy(isLoading = false, isRefreshing = false, error = null) }
 
@@ -314,9 +341,25 @@ class LiquidationMapViewModel @Inject constructor(
 
         val (prec, minMove) = coinPrecision[coin] ?: Pair(2, 0.01)
         _chartCommands.tryEmit(ChartCommand.SetPrecision(prec, minMove))
+
+        // Layer B: Send historical liquidation spikes from RTDB data
+        if (data.recentLiquidations.isNotEmpty()) {
+            val spikes = data.recentLiquidations.map { liq ->
+                mapOf<String, Any>(
+                    "time" to (liq.timestamp / 1000),
+                    "price" to liq.price,
+                    "side" to if (liq.side == LiqSide.LONG) "SELL" else "BUY",
+                    "quantity" to liq.quantity,
+                    "usdValue" to liq.usdValue
+                )
+            }
+            recentLiqSpikes.clear()
+            recentLiqSpikes.addAll(spikes.takeLast(MAX_SPIKE_BUFFER))
+            _chartCommands.tryEmit(ChartCommand.SetLiquidationSpikes(gson.toJson(recentLiqSpikes)))
+        }
     }
 
-    // ─── WebSocket (Real-time kline + mark price) ────────────────────
+    // ─── WebSocket (Real-time kline + mark price + liquidation) ──────
 
     private fun startWebSocket() {
         wsJob?.cancel()
@@ -345,8 +388,7 @@ class LiquidationMapViewModel @Inject constructor(
                             }
                         }
                         is FuturesWsEvent.Liquidation -> {
-                            // Real-time liquidation events — heatmap updates via RTDB listener
-                            Log.d(TAG, "Liq: ${event.data.side} $${event.data.usdValue}")
+                            handleLiquidationEvent(event.data)
                         }
                     }
                 }
@@ -364,6 +406,54 @@ class LiquidationMapViewModel @Inject constructor(
         )
         val json = gson.toJson(candleMap)
         _chartCommands.tryEmit(ChartCommand.UpdateCandle(json))
+    }
+
+    // ─── Layer B: Realized Liquidation Spike Pipeline ─────────────────
+
+    /** Load historical liquidation events from RTDB (via AggregatedData.recentLiquidations) */
+    private suspend fun loadHistoricalLiquidations(coin: String) {
+        try {
+            val data = _uiState.value.aggregatedData
+            val liqs = data?.recentLiquidations ?: return
+            if (liqs.isEmpty()) return
+
+            recentLiqSpikes.clear()
+            val spikes = liqs.map { liq ->
+                mapOf<String, Any>(
+                    "time" to (liq.timestamp / 1000),  // epoch seconds for chart alignment
+                    "price" to liq.price,
+                    "side" to if (liq.side == LiqSide.LONG) "SELL" else "BUY",
+                    "quantity" to liq.quantity,
+                    "usdValue" to liq.usdValue
+                )
+            }
+            recentLiqSpikes.addAll(spikes.takeLast(MAX_SPIKE_BUFFER))
+            _chartCommands.tryEmit(ChartCommand.SetLiquidationSpikes(gson.toJson(recentLiqSpikes)))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "Historical liq load failed", e)
+        }
+    }
+
+    /** Forward real-time WebSocket liquidation event to chart as spike */
+    private fun handleLiquidationEvent(liq: FuturesLiquidation) {
+        Log.d(TAG, "Liq: ${liq.side} \$${liq.usdValue}")
+
+        val spikeMap = mapOf<String, Any>(
+            "time" to (liq.tradeTime / 1000),
+            "price" to liq.price,
+            "side" to liq.side,  // BUY or SELL from Binance
+            "quantity" to liq.quantity,
+            "usdValue" to liq.usdValue
+        )
+
+        // Add to buffer
+        recentLiqSpikes.add(spikeMap)
+        if (recentLiqSpikes.size > MAX_SPIKE_BUFFER) {
+            recentLiqSpikes.removeAt(0)
+        }
+
+        _chartCommands.tryEmit(ChartCommand.AddLiquidationSpike(gson.toJson(spikeMap)))
     }
 
     // ─── User Preferences ────────────────────────────────────────────

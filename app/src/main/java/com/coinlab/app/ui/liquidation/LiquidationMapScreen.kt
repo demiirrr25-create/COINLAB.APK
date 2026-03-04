@@ -125,6 +125,23 @@ fun LiquidationMapScreen(
                             tint = CoinLabGreen
                         )
                     }
+                    // Hidden debug toggle — triple-tap to activate
+                    var debugTapCount by remember { mutableIntStateOf(0) }
+                    var lastDebugTap by remember { mutableLongStateOf(0L) }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable {
+                                val now = System.currentTimeMillis()
+                                if (now - lastDebugTap > 600) debugTapCount = 0
+                                debugTapCount++
+                                lastDebugTap = now
+                                if (debugTapCount >= 3) {
+                                    viewModel.toggleDebugMode()
+                                    debugTapCount = 0
+                                }
+                            }
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
@@ -310,6 +327,9 @@ private fun LiquidationChartWebView(
                 is ChartCommand.SetThreshold -> "setThreshold(${cmd.value})"
                 is ChartCommand.SetModel -> "setModel('${cmd.model}')"
                 is ChartCommand.SetLongShortTotals -> "setLongShortTotals(${cmd.totalLongUsd}, ${cmd.totalShortUsd})"
+                is ChartCommand.SetLiquidationSpikes -> "setLiquidationSpikes('${cmd.json.escapeForJs()}')"
+                is ChartCommand.AddLiquidationSpike -> "addLiquidationSpike('${cmd.json.escapeForJs()}')"
+                is ChartCommand.SetDebugMode -> "setDebugMode(${cmd.enabled})"
             }
             wv.post { wv.evaluateJavascript(js, null) }
         }

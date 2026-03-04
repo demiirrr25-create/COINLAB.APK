@@ -351,4 +351,11 @@
     <string name="liquidation_extreme_zone">Aşırı Bölge</string>
     <string name="liquidation_total_long">Toplam Long</string>
     <string name="liquidation_total_short">Toplam Short</string>
+
+    <!-- v12.4 Dual Layer Liquidation Map -->
+    <string name="liquidation_debug_mode">Debug Modu</string>
+    <string name="liquidation_oi_layer">Açık Pozisyon Katmanı</string>
+    <string name="liquidation_realized_layer">Gerçekleşen Tasfiyeler</string>
+    <string name="liquidation_render_time">Render Süresi</string>
+    <string name="liquidation_liq_count_1m">Son 1dk Tasfiye</string>
 </resources>

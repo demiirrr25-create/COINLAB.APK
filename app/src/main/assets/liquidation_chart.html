@@ -2,140 +2,51 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CoinLab Liquidation Map v12.3</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>CoinLab Liquidation Map v12.4</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-    width: 100%; height: 100%;
-    background: #000000;
-    overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-}
-#chart-container {
-    width: 100%; height: 100%;
-    position: relative;
-}
-#liq-canvas {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 1;
-}
-#tooltip {
-    display: none;
-    position: absolute;
-    z-index: 100;
-    padding: 10px 14px;
-    background: rgba(8, 6, 0, 0.96);
-    border: 1px solid rgba(247, 147, 26, 0.5);
-    border-radius: 8px;
-    color: #F0E6D2;
-    font-size: 12px;
-    pointer-events: none;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.7);
-    max-width: 260px;
-    line-height: 1.6;
-}
-#tooltip .tip-title { color: #FFC107; font-weight: 700; font-size: 13px; margin-bottom: 4px; }
-#tooltip .tip-long { color: #00C853; }
-#tooltip .tip-short { color: #FF1744; }
-#tooltip .tip-neutral { color: #9A8B6E; }
-#tooltip .tip-label { color: #6B6080; font-size: 11px; }
-#tooltip .tip-divider { border-top: 1px solid rgba(247,147,26,0.15); margin: 5px 0; }
-#watermark {
-    position: absolute;
-    bottom: 8px; right: 12px;
-    color: rgba(247, 147, 26, 0.10);
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    pointer-events: none;
-    z-index: 2;
-}
-#loading {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    transition: opacity 0.4s;
-}
-#loading.hidden { opacity: 0; pointer-events: none; }
-.spinner {
-    width: 32px; height: 32px;
-    border: 3px solid rgba(247, 147, 26, 0.2);
-    border-top-color: #F7931A;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-/* Stats header */
-#stats-header {
-    position: absolute;
-    top: 6px; left: 10px;
-    z-index: 50;
-    display: flex;
-    gap: 14px;
-    font-size: 11px;
-    font-weight: 600;
-    pointer-events: none;
-}
-#stats-header .sh-long { color: #00C853; }
-#stats-header .sh-short { color: #FF1744; }
-#stats-header .sh-label { color: #6B6080; font-size: 10px; font-weight: 400; }
-/* Legend */
-#legend {
-    position: absolute;
-    top: 6px; right: 10px;
-    z-index: 50;
-    display: flex;
-    gap: 10px;
-    font-size: 10px;
-    color: #6B6080;
-    pointer-events: none;
-}
-.legend-item { display: flex; align-items: center; gap: 3px; }
-.legend-dot { width: 7px; height: 7px; border-radius: 50%; }
-/* Scale bar */
-#scale-bar {
-    position: absolute;
-    bottom: 28px; left: 10px; right: 78px;
-    height: 8px;
-    z-index: 50;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #1a237e, #0064C8, #00C853, #FFC107, #FF1744);
-    opacity: 0.6;
-    pointer-events: none;
-}
-#scale-labels {
-    position: absolute;
-    bottom: 16px; left: 10px; right: 78px;
-    z-index: 50;
-    display: flex;
-    justify-content: space-between;
-    font-size: 8px;
-    color: #6B6080;
-    pointer-events: none;
-}
-#max-liq-label {
-    position: absolute;
-    bottom: 18px; right: 10px;
-    z-index: 50;
-    font-size: 10px;
-    color: #FFC107;
-    font-weight: 600;
-    pointer-events: none;
-}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  -webkit-tap-highlight-color:transparent;touch-action:none}
+#chart-container{width:100%;height:100%;position:relative}
+#liq-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#tooltip{display:none;position:absolute;z-index:100;padding:10px 14px;
+  background:rgba(8,6,0,0.96);border:1px solid rgba(247,147,26,0.5);border-radius:8px;
+  color:#F0E6D2;font-size:12px;pointer-events:none;backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);box-shadow:0 4px 24px rgba(0,0,0,0.7);max-width:280px;line-height:1.6}
+#tooltip .tip-title{color:#FFC107;font-weight:700;font-size:13px;margin-bottom:4px}
+#tooltip .tip-long{color:#00C853}
+#tooltip .tip-short{color:#FF1744}
+#tooltip .tip-neutral{color:#9A8B6E}
+#tooltip .tip-label{color:#6B6080;font-size:11px}
+#tooltip .tip-divider{border-top:1px solid rgba(247,147,26,0.15);margin:5px 0}
+#watermark{position:absolute;bottom:8px;right:12px;color:rgba(247,147,26,0.10);
+  font-size:14px;font-weight:700;letter-spacing:1px;pointer-events:none;z-index:2}
+#loading{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;
+  display:flex;align-items:center;justify-content:center;z-index:200;transition:opacity 0.4s}
+#loading.hidden{opacity:0;pointer-events:none}
+.spinner{width:32px;height:32px;border:3px solid rgba(247,147,26,0.2);
+  border-top-color:#F7931A;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#stats-header{position:absolute;top:6px;left:10px;z-index:50;display:flex;gap:14px;
+  font-size:11px;font-weight:600;pointer-events:none}
+#stats-header .sh-long{color:#00C853}
+#stats-header .sh-short{color:#FF1744}
+#stats-header .sh-label{color:#6B6080;font-size:10px;font-weight:400}
+#legend{position:absolute;top:6px;right:10px;z-index:50;display:flex;gap:10px;
+  font-size:10px;color:#6B6080;pointer-events:none}
+.legend-item{display:flex;align-items:center;gap:3px}
+.legend-dot{width:7px;height:7px;border-radius:50%}
+/* Debug overlay */
+#debug-overlay{display:none;position:absolute;top:28px;right:8px;z-index:150;
+  padding:8px 12px;background:rgba(0,0,0,0.85);border:1px solid rgba(247,147,26,0.3);
+  border-radius:6px;font-size:10px;color:#9A8B6E;line-height:1.8;pointer-events:none;
+  font-family:'Courier New',monospace}
+#debug-overlay .dv{color:#FFC107;font-weight:600}
+#debug-overlay .dl{color:#00C853}
+#debug-overlay .ds{color:#FF1744}
 </style>
 </head>
 <body>
@@ -148,52 +59,58 @@ html, body {
         <span><span class="sh-label">▼ Long </span><span class="sh-long" id="total-long">$0</span></span>
     </div>
     <div id="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#00C853"></div>Long</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#FF1744"></div>Short</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00C853"></div>Long OI</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF1744"></div>Short OI</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4FC3F7"></div>Liq Spike</div>
         <div class="legend-item"><div class="legend-dot" style="background:rgba(255,193,7,0.5)"></div>Isı</div>
     </div>
-    <div id="scale-bar"></div>
-    <div id="scale-labels"><span>Düşük</span><span>Orta</span><span>Yüksek</span><span>Aşırı</span></div>
-    <div id="max-liq-label">$0</div>
+    <div id="debug-overlay">
+        <div>Long OI: <span class="dl" id="dbg-long-oi">0</span></div>
+        <div>Short OI: <span class="ds" id="dbg-short-oi">0</span></div>
+        <div>Liq/1m: <span class="dv" id="dbg-liq-count">0</span></div>
+        <div>Render: <span class="dv" id="dbg-render-ms">0</span> ms</div>
+    </div>
     <div id="loading"><div class="spinner"></div></div>
 </div>
 
 <script>
 'use strict';
 // ═══════════════════════════════════════════════════════════════════
-// CoinLab v12.3 — CoinGlass-Style Open Interest Liquidation Map
+// CoinLab v12.4 — Dual Layer Liquidation Map
 //
-// Architecture:
-//   Candlestick chart (TradingView LW Charts 4.1.3)
-//   + Canvas overlay with:
-//       Layer 1: Heatmap background (max 35% opacity)
-//       Layer 2: Long bars (green, below mark price, grow downward)
-//       Layer 3: Short bars (red, above mark price, grow upward)
-//       Layer 4: Glow on extreme clusters
-//       Layer 5: "EXTREME ZONE" labels
-//       Layer 6: Mark price dashed line
-//       Layer 7: Long/Short USD totals in header
+// LAYER A: Open Interest Cluster Layer (price-axis histogram)
+//   Short OI bars → RED above mark price, grow upward
+//   Long OI bars  → GREEN below mark price, grow downward
+//   max_bar_height = 25% of chart area
 //
-//   60 FPS via requestAnimationFrame throttle
-//   Scroll-safe: offscreen bitmap cache, re-render only on data/range change
-//   300ms fade on timeframe switch
+// LAYER B: Realized Liquidation Spike Layer (time-axis, candle-aligned)
+//   Long liquidation  → RED spike below candle
+//   Short liquidation → GREEN spike above candle
+//   spike_height = log(quantity) scaled, min 3px, glow on large
+//
+// Render order: Grid → Candle → Heatmap → OI Bars → Liq Spikes → Crosshair
+// Canvas 2D, 60 FPS, offscreen cache, 300ms fade
 // ═══════════════════════════════════════════════════════════════════
 
-// ─── Color palette ────────────────────────────────────────────────
+// ─── Color Constants ─────────────────────────────────────────────
 const HEAT_COLORS = [
-    { s: 0.00, r: 26,  g: 35,  b: 126 },   // Deep blue
-    { s: 0.25, r: 0,   g: 100, b: 200 },   // Blue
-    { s: 0.50, r: 0,   g: 200, b: 83  },   // Green
-    { s: 0.75, r: 255, g: 193, b: 7   },   // Yellow
-    { s: 1.00, r: 255, g: 23,  b: 68  }    // Red
+    {s:0.00,r:26,g:35,b:126},   // Deep blue
+    {s:0.25,r:0,g:100,b:200},   // Blue
+    {s:0.50,r:0,g:200,b:83},    // Green
+    {s:0.75,r:255,g:193,b:7},   // Yellow
+    {s:1.00,r:255,g:23,b:68}    // Red
 ];
-const SHORT_COLOR  = { r: 255, g: 23,  b: 68  };  // #FF1744
-const LONG_COLOR   = { r: 0,   g: 200, b: 83  };  // #00C853
+const SHORT_COLOR = {r:255,g:23,b:68};    // #FF1744
+const LONG_COLOR  = {r:0,g:200,b:83};     // #00C853
+const SPIKE_SHORT_COLOR = '#00C853';       // Short liq = green spike (above candle)
+const SPIKE_LONG_COLOR  = '#FF1744';       // Long liq = red spike (below candle)
 
-// ─── State ────────────────────────────────────────────────────────
+// ─── State ───────────────────────────────────────────────────────
 let chart = null, candleSeries = null, volumeSeries = null;
 let liqCanvas = null, ctx = null;
 let offCanvas = null, offCtx = null;
+
+// Layer A: OI Cluster data (price-axis)
 let heatmapData = [];
 let candleData  = [];
 let markPrice   = 0;
@@ -201,15 +118,24 @@ let totalLongUsd  = 0;
 let totalShortUsd = 0;
 let currentThreshold = 0.5;
 let currentModel = 'Standard';
+
+// Layer B: Realized Liquidation Spikes (time-axis)
+let liquidationSpikes = [];   // {time, price, side, quantity, usdValue}
+const MAX_SPIKES = 2000;
+
+// Debug
+let debugMode = false;
+let lastRenderMs = 0;
+let liqCountBuffer = [];      // timestamps of recent liquidations for 1m count
+
+// Render control
 let renderPending = false;
 let lastRenderTs  = 0;
 let fadeAlpha = 1.0;
-let fadeTarget = 1.0;
 let fadeTimer = null;
-let cacheValid = false;
 const FPS_INTERVAL = 16;  // ~60 FPS
 
-// ─── Initialization ───────────────────────────────────────────────
+// ─── Chart Init ──────────────────────────────────────────────────
 function initChart() {
     const box = document.getElementById('chart-container');
     const W = box.clientWidth, H = box.clientHeight;
@@ -217,23 +143,23 @@ function initChart() {
     chart = LightweightCharts.createChart(box, {
         width: W, height: H,
         layout: {
-            background: { type: 'solid', color: '#000000' },
+            background: {type:'solid',color:'#000000'},
             textColor: '#7A7060',
             fontSize: 11,
-            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+            fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif'
         },
         grid: {
-            vertLines: { color: 'rgba(40,30,15,0.45)', style: 1 },
-            horzLines: { color: 'rgba(40,30,15,0.45)', style: 1 }
+            vertLines: {color:'rgba(40,30,15,0.45)',style:1},
+            horzLines: {color:'rgba(40,30,15,0.45)',style:1}
         },
         crosshair: {
             mode: LightweightCharts.CrosshairMode.Normal,
-            vertLine: { color: 'rgba(247,147,26,0.35)', width: 1, style: 2, labelBackgroundColor: '#F7931A' },
-            horzLine: { color: 'rgba(247,147,26,0.35)', width: 1, style: 2, labelBackgroundColor: '#F7931A' }
+            vertLine: {color:'rgba(247,147,26,0.35)',width:1,style:2,labelBackgroundColor:'#F7931A'},
+            horzLine: {color:'rgba(247,147,26,0.35)',width:1,style:2,labelBackgroundColor:'#F7931A'}
         },
         rightPriceScale: {
             borderColor: 'rgba(40,30,15,0.45)',
-            scaleMargins: { top: 0.08, bottom: 0.22 },
+            scaleMargins: {top:0.08,bottom:0.22},
             textColor: '#7A7060'
         },
         timeScale: {
@@ -243,23 +169,23 @@ function initChart() {
             barSpacing: 8,
             minBarSpacing: 4
         },
-        handleScroll: { vertTouchDrag: true, pressedMouseMove: true },
-        handleScale: { axisPressedMouseMove: true, pinchToZoom: true, mouseWheel: true }
+        handleScroll: {vertTouchDrag:true,pressedMouseMove:true},
+        handleScale: {axisPressedMouseMove:true,pinchToZoom:true,mouseWheel:true}
     });
 
     candleSeries = chart.addCandlestickSeries({
-        upColor: '#00C853', downColor: '#FF1744',
-        borderUpColor: '#00C853', borderDownColor: '#FF1744',
-        wickUpColor: '#00C853', wickDownColor: '#FF1744',
-        priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
+        upColor:'#00C853',downColor:'#FF1744',
+        borderUpColor:'#00C853',borderDownColor:'#FF1744',
+        wickUpColor:'#00C853',wickDownColor:'#FF1744',
+        priceFormat:{type:'price',precision:2,minMove:0.01}
     });
 
     volumeSeries = chart.addHistogramSeries({
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'vol',
-        color: 'rgba(247,147,26,0.15)'
+        priceFormat:{type:'volume'},
+        priceScaleId:'vol',
+        color:'rgba(247,147,26,0.15)'
     });
-    chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.87, bottom: 0 } });
+    chart.priceScale('vol').applyOptions({scaleMargins:{top:0.87,bottom:0}});
 
     // Canvas setup
     liqCanvas = document.getElementById('liq-canvas');
@@ -273,536 +199,720 @@ function initChart() {
     offCtx.scale(devicePixelRatio, devicePixelRatio);
 
     chart.subscribeCrosshairMove(onCrosshair);
-    chart.timeScale().subscribeVisibleLogicalRangeChange(() => { cacheValid = false; scheduleRender(); });
-    chart.timeScale().subscribeVisibleTimeRangeChange(() => { cacheValid = false; scheduleRender(); });
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
+    chart.timeScale().subscribeVisibleTimeRangeChange(onRangeChange);
 
     new ResizeObserver(entries => {
-        const { width: rw, height: rh } = entries[0].contentRect;
-        chart.applyOptions({ width: rw, height: rh });
-        sizeCanvas(liqCanvas, rw, rh);
-        ctx = liqCanvas.getContext('2d'); ctx.scale(devicePixelRatio, devicePixelRatio);
-        sizeCanvas(offCanvas, rw, rh);
-        offCtx = offCanvas.getContext('2d'); offCtx.scale(devicePixelRatio, devicePixelRatio);
-        cacheValid = false;
+        const {width:rw,height:rh} = entries[0].contentRect;
+        chart.applyOptions({width:rw,height:rh});
+        sizeCanvas(liqCanvas,rw,rh);
+        ctx = liqCanvas.getContext('2d'); ctx.scale(devicePixelRatio,devicePixelRatio);
+        sizeCanvas(offCanvas,rw,rh);
+        offCtx = offCanvas.getContext('2d'); offCtx.scale(devicePixelRatio,devicePixelRatio);
         scheduleRender();
     }).observe(box);
 
     document.getElementById('loading').classList.add('hidden');
 }
 
-function sizeCanvas(c, w, h) {
-    c.width  = w * devicePixelRatio;
-    c.height = h * devicePixelRatio;
-    c.style.width  = w + 'px';
-    c.style.height = h + 'px';
+function sizeCanvas(c,w,h){
+    c.width=w*devicePixelRatio;c.height=h*devicePixelRatio;
+    c.style.width=w+'px';c.style.height=h+'px';
+}
+function onRangeChange(){ scheduleRender(); }
+
+// ─── 60 FPS Throttle ────────────────────────────────────────────
+function scheduleRender(){
+    if(renderPending) return;
+    const now=performance.now();
+    const wait=Math.max(0,FPS_INTERVAL-(now-lastRenderTs));
+    renderPending=true;
+    if(wait<2) requestAnimationFrame(doRender);
+    else setTimeout(()=>requestAnimationFrame(doRender),wait);
+}
+function doRender(){
+    const t0=performance.now();
+    renderAll();
+    lastRenderMs=performance.now()-t0;
+    lastRenderTs=performance.now();
+    renderPending=false;
+    if(debugMode) updateDebugOverlay();
 }
 
-// ─── 60 FPS Throttle ─────────────────────────────────────────────
-function scheduleRender() {
-    if (renderPending) return;
-    const now = performance.now();
-    const wait = Math.max(0, FPS_INTERVAL - (now - lastRenderTs));
-    renderPending = true;
-    if (wait < 2) {
-        requestAnimationFrame(doRender);
-    } else {
-        setTimeout(() => requestAnimationFrame(doRender), wait);
-    }
-}
-function doRender() {
-    renderLiquidationMap();
-    lastRenderTs = performance.now();
-    renderPending = false;
-}
-
-// ─── 300ms Fade on Timeframe Change ──────────────────────────────
-function triggerFade() {
-    fadeAlpha = 0;
-    fadeTarget = 1;
-    if (fadeTimer) cancelAnimationFrame(fadeTimer);
-    const start = performance.now();
-    function step(ts) {
-        const t = Math.min((ts - start) / 300, 1);
-        fadeAlpha = t;
+// ─── 300ms Fade ─────────────────────────────────────────────────
+function triggerFade(){
+    fadeAlpha=0;
+    if(fadeTimer) cancelAnimationFrame(fadeTimer);
+    const start=performance.now();
+    function step(ts){
+        const t=Math.min((ts-start)/300,1);
+        fadeAlpha=t;
         scheduleRender();
-        if (t < 1) fadeTimer = requestAnimationFrame(step);
+        if(t<1) fadeTimer=requestAnimationFrame(step);
     }
-    fadeTimer = requestAnimationFrame(step);
+    fadeTimer=requestAnimationFrame(step);
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// MAIN RENDER: CoinGlass-Style Liquidation Map
+// MAIN RENDER ENGINE — 6 Layer Architecture
 // ═══════════════════════════════════════════════════════════════════
-function renderLiquidationMap() {
-    if (!ctx || !chart || heatmapData.length === 0) return;
+function renderAll(){
+    if(!ctx||!chart) return;
 
-    const box = document.getElementById('chart-container');
-    const W = box.clientWidth, H = box.clientHeight;
-    const ts = chart.timeScale();
-    const visRange = ts.getVisibleLogicalRange();
-    if (!visRange) return;
+    const box=document.getElementById('chart-container');
+    const W=box.clientWidth, H=box.clientHeight;
+    const ts=chart.timeScale();
+    const visRange=ts.getVisibleLogicalRange();
+    if(!visRange) return;
 
-    // Visible candle data
-    const fromIdx = Math.max(0, Math.floor(visRange.from));
-    const toIdx   = Math.min(candleData.length - 1, Math.ceil(visRange.to));
-    if (fromIdx > toIdx) return;
+    const fromIdx=Math.max(0,Math.floor(visRange.from));
+    const toIdx=Math.min(candleData.length-1,Math.ceil(visRange.to));
+    if(fromIdx>toIdx && heatmapData.length===0) return;
 
-    let vHigh = -Infinity, vLow = Infinity;
-    for (let i = fromIdx; i <= toIdx; i++) {
-        if (candleData[i].high > vHigh) vHigh = candleData[i].high;
-        if (candleData[i].low  < vLow)  vLow  = candleData[i].low;
+    // Visible price range
+    let vHigh=-Infinity, vLow=Infinity;
+    for(let i=fromIdx;i<=toIdx;i++){
+        if(!candleData[i]) continue;
+        if(candleData[i].high>vHigh) vHigh=candleData[i].high;
+        if(candleData[i].low<vLow) vLow=candleData[i].low;
     }
-    const pRange = vHigh - vLow;
-    if (pRange <= 0) return;
+    if(vHigh===-Infinity) return;
+    const pRange=vHigh-vLow;
+    if(pRange<=0) return;
 
-    const eHigh = vHigh + pRange * 0.08;
-    const eLow  = vLow  - pRange * 0.08;
-    const rightPanel = 65;
-    const cW = W - rightPanel;
-    const topM = H * 0.08;
-    const botM = H * 0.22;
-    const cH = H - topM - botM;
+    const eHigh=vHigh+pRange*0.08;
+    const eLow=vLow-pRange*0.08;
+    const rightPanel=65;
+    const cW=W-rightPanel;
+    const topM=H*0.08;
+    const botM=H*0.22;
+    const cH=H-topM-botM;
+    const maxBarPx=cH*0.25;  // OI bars max 25% of chart area
+    const mp=markPrice>0?markPrice:(vHigh+vLow)/2;
 
-    // Pre-compute max densities for normalization
-    let maxLong = 0, maxShort = 0, maxTotal = 0;
-    for (const b of heatmapData) {
-        if (b.longUsd  > maxLong)  maxLong  = b.longUsd;
-        if (b.shortUsd > maxShort) maxShort = b.shortUsd;
-        if (b.totalUsd > maxTotal) maxTotal = b.totalUsd;
-    }
-    if (maxTotal < 1) maxTotal = 1;
-    if (maxLong  < 1) maxLong  = 1;
-    if (maxShort < 1) maxShort = 1;
-
-    const normFn = getNormFunc(currentModel);
-    const mp = markPrice > 0 ? markPrice : (vHigh + vLow) / 2;
-
-    // Helpers
-    function priceToY(p) {
-        const frac = (p - eLow) / (eHigh - eLow);
-        return topM + cH * (1 - frac);
+    function priceToY(p){
+        const frac=(p-eLow)/(eHigh-eLow);
+        return topM+cH*(1-frac);
     }
 
     // ─── OFFSCREEN RENDER ────────────────────────────────────────
-    offCtx.clearRect(0, 0, W, H);
-    const numB = heatmapData.length;
-    const bandH = Math.max(cH / numB * 1.15, 2.5);
+    offCtx.clearRect(0,0,W,H);
 
-    // Collect extreme zones
-    const extremes = [];
+    // ── LAYER 1: Heatmap Background (max 35% opacity) ───────────
+    renderHeatmapBackground(offCtx, cW, cH, topM, eLow, eHigh, priceToY);
 
-    for (let i = 0; i < numB; i++) {
-        const b = heatmapData[i];
-        if (b.priceLevel < eLow || b.priceLevel > eHigh) continue;
+    // ── LAYER 2: OI Cluster Bars (price-axis histogram) ─────────
+    renderOIBars(offCtx, cW, cH, topM, eLow, eHigh, priceToY, mp, maxBarPx);
 
-        const rawNorm = b.totalUsd / maxTotal;
-        if (rawNorm < currentThreshold * 0.3) continue;
+    // ── LAYER 3: Realized Liquidation Spikes (time-axis) ────────
+    renderLiquidationSpikes(offCtx, W, H, cW, cH, topM, botM, eLow, eHigh, priceToY, ts, fromIdx, toIdx);
 
-        const norm = normFn(rawNorm);
-        if (norm < 0.015) continue;
+    // ── LAYER 4: Mark Price Line ────────────────────────────────
+    renderMarkPriceLine(offCtx, cW, mp, eLow, eHigh, priceToY);
 
-        const y = priceToY(b.priceLevel);
-        const isAboveMark = b.priceLevel > mp;
+    // ── LAYER 5: Extreme Zone Labels ────────────────────────────
+    renderExtremeLabels(offCtx, cW, eLow, eHigh, priceToY, mp);
 
-        // ── Layer 1: Heatmap background (max 35% opacity) ──
-        const hCol = heatColor(norm);
-        const hAlpha = Math.min(norm * 0.35, 0.35);
-        offCtx.fillStyle = `rgba(${hCol.r},${hCol.g},${hCol.b},${hAlpha})`;
-        offCtx.fillRect(0, y - bandH / 2, cW, bandH);
+    // ─── BLIT to screen ─────────────────────────────────────────
+    ctx.clearRect(0,0,W,H);
+    ctx.globalAlpha=fadeAlpha;
+    ctx.drawImage(offCanvas,0,0,W*devicePixelRatio,H*devicePixelRatio,0,0,W,H);
+    ctx.globalAlpha=1.0;
 
-        // ── Layer 2 & 3: Directional bars ──
-        // Short bars → above mark price → red, grow UPWARD from bar center
-        // Long bars  → below mark price → green, grow DOWNWARD from bar center
-        if (isAboveMark) {
-            // SHORT bar — intensity based on shortUsd
-            const sNorm = normFn(b.shortUsd / maxShort);
-            if (sNorm > 0.02) {
-                const barW = sNorm * (cW * 0.85);
-                const barH = bandH * 0.8;
-                const bx = (cW - barW) / 2;
+    // Header stats
+    document.getElementById('total-long').textContent='$'+fmtCompact(totalLongUsd);
+    document.getElementById('total-short').textContent='$'+fmtCompact(totalShortUsd);
+}
 
-                // Gradient from dark red to bright red
-                const grad = offCtx.createLinearGradient(bx, y, bx + barW, y);
-                const aBase = 0.3 + sNorm * 0.65;
-                grad.addColorStop(0,   `rgba(180,10,40,${aBase * 0.5})`);
-                grad.addColorStop(0.3, `rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${aBase * 0.7})`);
-                grad.addColorStop(0.7, `rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${aBase})`);
-                grad.addColorStop(1,   `rgba(180,10,40,${aBase * 0.5})`);
+// ═══════════════════════════════════════════════════════════════════
+// LAYER 1: Heatmap Background
+// ═══════════════════════════════════════════════════════════════════
+function renderHeatmapBackground(c, cW, cH, topM, eLow, eHigh, priceToY){
+    if(heatmapData.length===0) return;
+    const numB=heatmapData.length;
+    const bandH=Math.max(cH/numB*1.15,2.5);
+    let maxTotal=0;
+    for(const b of heatmapData) if(b.totalUsd>maxTotal) maxTotal=b.totalUsd;
+    if(maxTotal<1) return;
+    const normFn=getNormFunc(currentModel);
 
-                offCtx.fillStyle = grad;
-                // Bar positioned at y, extends upward
-                offCtx.fillRect(bx, y - barH, barW, barH);
+    for(const b of heatmapData){
+        if(b.priceLevel<eLow||b.priceLevel>eHigh) continue;
+        const rawNorm=b.totalUsd/maxTotal;
+        if(rawNorm<currentThreshold*0.3) continue;
+        const norm=normFn(rawNorm);
+        if(norm<0.015) continue;
+        const y=priceToY(b.priceLevel);
+        const hCol=heatColor(norm);
+        const hAlpha=Math.min(norm*0.35,0.35);
+        c.fillStyle=`rgba(${hCol.r},${hCol.g},${hCol.b},${hAlpha})`;
+        c.fillRect(0,y-bandH/2,cW,bandH);
+    }
+}
 
-                // Side intensity indicator
-                const sideW = Math.max(sNorm * 6, 1.5);
-                offCtx.fillStyle = `rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${aBase})`;
-                offCtx.fillRect(cW - sideW - 1, y - barH, sideW, barH);
+// ═══════════════════════════════════════════════════════════════════
+// LAYER 2: OI Cluster Bars (price-axis histogram)
+//   Short clusters → RED bars ABOVE mark price, grow UPWARD
+//   Long clusters  → GREEN bars BELOW mark price, grow DOWNWARD
+//   Bar height = (cluster_value / max_visible_cluster) × maxBarPx
+//   maxBarPx = 25% of chart area
+// ═══════════════════════════════════════════════════════════════════
+function renderOIBars(c, cW, cH, topM, eLow, eHigh, priceToY, mp, maxBarPx){
+    if(heatmapData.length===0) return;
+
+    // Compute max values from VISIBLE buckets only (re-normalize on zoom)
+    let maxLongVis=0, maxShortVis=0;
+    for(const b of heatmapData){
+        if(b.priceLevel<eLow||b.priceLevel>eHigh) continue;
+        if(b.longUsd>maxLongVis) maxLongVis=b.longUsd;
+        if(b.shortUsd>maxShortVis) maxShortVis=b.shortUsd;
+    }
+    if(maxLongVis<1) maxLongVis=1;
+    if(maxShortVis<1) maxShortVis=1;
+
+    const normFn=getNormFunc(currentModel);
+    const numB=heatmapData.length;
+    const bandH=Math.max(cH/numB*0.85,2);
+
+    for(const b of heatmapData){
+        if(b.priceLevel<eLow||b.priceLevel>eHigh) continue;
+        const y=priceToY(b.priceLevel);
+        const isAboveMark=b.priceLevel>mp;
+
+        if(isAboveMark){
+            // SHORT OI bar — red, grows UPWARD from price level
+            const sNorm=normFn(b.shortUsd/maxShortVis);
+            if(sNorm<0.02) continue;
+            const barH=Math.min(sNorm*maxBarPx, maxBarPx);
+            const barW=sNorm*(cW*0.82);
+            const bx=(cW-barW)/2;
+            const alpha=0.3+sNorm*0.65;
+
+            // Gradient fill
+            const grad=c.createLinearGradient(bx,y,bx+barW,y);
+            grad.addColorStop(0,`rgba(180,10,40,${alpha*0.4})`);
+            grad.addColorStop(0.3,`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${alpha*0.65})`);
+            grad.addColorStop(0.7,`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${alpha})`);
+            grad.addColorStop(1,`rgba(180,10,40,${alpha*0.4})`);
+            c.fillStyle=grad;
+            c.fillRect(bx,y-barH,barW,barH);
+
+            // Side intensity indicator
+            const sideW=Math.max(sNorm*6,1.5);
+            c.fillStyle=`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${alpha})`;
+            c.fillRect(cW-sideW-1,y-barH,sideW,barH);
+
+            // Glow on high density (>0.65)
+            if(sNorm>0.65){
+                const ga=(sNorm-0.65)*0.8;
+                c.save();
+                c.shadowColor=`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${ga})`;
+                c.shadowBlur=12+sNorm*16;
+                c.fillStyle=`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},${ga*0.25})`;
+                c.fillRect(bx,y-barH,barW,barH);
+                c.restore();
             }
         } else {
-            // LONG bar — intensity based on longUsd
-            const lNorm = normFn(b.longUsd / maxLong);
-            if (lNorm > 0.02) {
-                const barW = lNorm * (cW * 0.85);
-                const barH = bandH * 0.8;
-                const bx = (cW - barW) / 2;
+            // LONG OI bar — green, grows DOWNWARD from price level
+            const lNorm=normFn(b.longUsd/maxLongVis);
+            if(lNorm<0.02) continue;
+            const barH=Math.min(lNorm*maxBarPx, maxBarPx);
+            const barW=lNorm*(cW*0.82);
+            const bx=(cW-barW)/2;
+            const alpha=0.3+lNorm*0.65;
 
-                const grad = offCtx.createLinearGradient(bx, y, bx + barW, y);
-                const aBase = 0.3 + lNorm * 0.65;
-                grad.addColorStop(0,   `rgba(0,120,50,${aBase * 0.5})`);
-                grad.addColorStop(0.3, `rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${aBase * 0.7})`);
-                grad.addColorStop(0.7, `rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${aBase})`);
-                grad.addColorStop(1,   `rgba(0,120,50,${aBase * 0.5})`);
+            const grad=c.createLinearGradient(bx,y,bx+barW,y);
+            grad.addColorStop(0,`rgba(0,120,50,${alpha*0.4})`);
+            grad.addColorStop(0.3,`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${alpha*0.65})`);
+            grad.addColorStop(0.7,`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${alpha})`);
+            grad.addColorStop(1,`rgba(0,120,50,${alpha*0.4})`);
+            c.fillStyle=grad;
+            c.fillRect(bx,y,barW,barH);
 
-                offCtx.fillStyle = grad;
-                // Bar positioned at y, extends downward
-                offCtx.fillRect(bx, y, barW, barH);
+            const sideW=Math.max(lNorm*6,1.5);
+            c.fillStyle=`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${alpha})`;
+            c.fillRect(cW-sideW-1,y,sideW,barH);
 
-                const sideW = Math.max(lNorm * 6, 1.5);
-                offCtx.fillStyle = `rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${aBase})`;
-                offCtx.fillRect(cW - sideW - 1, y, sideW, barH);
+            if(lNorm>0.65){
+                const ga=(lNorm-0.65)*0.8;
+                c.save();
+                c.shadowColor=`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${ga})`;
+                c.shadowBlur=12+lNorm*16;
+                c.fillStyle=`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},${ga*0.25})`;
+                c.fillRect(bx,y,barW,barH);
+                c.restore();
             }
         }
-
-        // ── Layer 4: Glow on high-density clusters ──
-        if (norm > 0.65) {
-            const glowA = (norm - 0.65) * 0.8;
-            const gc = isAboveMark ? SHORT_COLOR : LONG_COLOR;
-            offCtx.save();
-            offCtx.shadowColor = `rgba(${gc.r},${gc.g},${gc.b},${glowA})`;
-            offCtx.shadowBlur = 12 + norm * 16;
-            offCtx.fillStyle = `rgba(${gc.r},${gc.g},${gc.b},${glowA * 0.3})`;
-            offCtx.fillRect(0, y - bandH, cW, bandH * 2);
-            offCtx.restore();
-        }
-
-        // Track extreme zones
-        if (norm > 0.82) {
-            extremes.push({ y, norm, price: b.priceLevel, isAboveMark, totalUsd: b.totalUsd });
-        }
-    }
-
-    // ── Layer 5: "EXTREME ZONE" labels ──
-    // Take top 3 extremes
-    extremes.sort((a, b) => b.norm - a.norm);
-    const topExtremes = extremes.slice(0, 3);
-    for (const ez of topExtremes) {
-        offCtx.save();
-        offCtx.font = 'bold 9px -apple-system, BlinkMacSystemFont, sans-serif';
-        const labelText = '⚡ EXTREME ZONE';
-        const lw = offCtx.measureText(labelText).width;
-        const lx = cW - lw - 16;
-        const ly = ez.y + (ez.isAboveMark ? -8 : 14);
-
-        // Label background
-        offCtx.fillStyle = 'rgba(0,0,0,0.7)';
-        offCtx.beginPath();
-        offCtx.roundRect(lx - 4, ly - 10, lw + 8, 14, 3);
-        offCtx.fill();
-
-        // Label border
-        const borderColor = ez.isAboveMark ? `rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},0.6)` : `rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},0.6)`;
-        offCtx.strokeStyle = borderColor;
-        offCtx.lineWidth = 0.8;
-        offCtx.beginPath();
-        offCtx.roundRect(lx - 4, ly - 10, lw + 8, 14, 3);
-        offCtx.stroke();
-
-        // Label text
-        offCtx.fillStyle = ez.isAboveMark ? '#FF6B6B' : '#69F0AE';
-        offCtx.fillText(labelText, lx, ly);
-
-        // Price + USD
-        offCtx.font = '8px -apple-system, sans-serif';
-        offCtx.fillStyle = '#9A8B6E';
-        offCtx.fillText('$' + fmtCompact(ez.totalUsd), lx, ly + 11);
-
-        offCtx.restore();
-    }
-
-    // ── Layer 6: Mark Price dashed line ──
-    if (mp > eLow && mp < eHigh) {
-        const my = priceToY(mp);
-        offCtx.save();
-        offCtx.setLineDash([8, 5]);
-        offCtx.strokeStyle = 'rgba(255,193,7,0.55)';
-        offCtx.lineWidth = 1.2;
-        offCtx.beginPath();
-        offCtx.moveTo(0, my);
-        offCtx.lineTo(cW, my);
-        offCtx.stroke();
-
-        // Mark price label
-        offCtx.setLineDash([]);
-        offCtx.font = 'bold 10px -apple-system, sans-serif';
-        offCtx.fillStyle = 'rgba(0,0,0,0.75)';
-        const mpText = 'Mark ' + fmtPrice(mp);
-        const mpW = offCtx.measureText(mpText).width;
-        offCtx.fillRect(4, my - 13, mpW + 8, 16);
-        offCtx.fillStyle = '#FFC107';
-        offCtx.fillText(mpText, 8, my - 1);
-        offCtx.restore();
-    }
-
-    // ─── BLIT to screen canvas with fade alpha ────────────────────
-    ctx.clearRect(0, 0, W, H);
-    ctx.globalAlpha = fadeAlpha;
-    ctx.drawImage(offCanvas, 0, 0, W * devicePixelRatio, H * devicePixelRatio, 0, 0, W, H);
-    ctx.globalAlpha = 1.0;
-
-    // Update stats header
-    document.getElementById('total-long').textContent  = '$' + fmtCompact(totalLongUsd);
-    document.getElementById('total-short').textContent = '$' + fmtCompact(totalShortUsd);
-    document.getElementById('max-liq-label').textContent = '$' + fmtCompact(maxTotal);
-
-    cacheValid = true;
-}
-
-// ─── Model Normalization ──────────────────────────────────────────
-function getNormFunc(model) {
-    switch (model) {
-        case 'Aggressive':    return v => Math.log(1 + v * 9) / Math.log(10);
-        case 'Conservative':  return v => Math.sqrt(v);
-        default:              return v => v;
     }
 }
 
-// ─── Heatmap Color Interpolation ──────────────────────────────────
-function heatColor(t) {
-    t = Math.max(0, Math.min(1, t));
-    let lo = HEAT_COLORS[0], hi = HEAT_COLORS[HEAT_COLORS.length - 1];
-    for (let i = 0; i < HEAT_COLORS.length - 1; i++) {
-        if (t >= HEAT_COLORS[i].s && t <= HEAT_COLORS[i + 1].s) {
-            lo = HEAT_COLORS[i]; hi = HEAT_COLORS[i + 1]; break;
+// ═══════════════════════════════════════════════════════════════════
+// LAYER 3: Realized Liquidation Spikes (time-axis, candle-aligned)
+//   Long liq (SELL)  → RED spike BELOW candle low
+//   Short liq (BUY)  → GREEN spike ABOVE candle high
+//   spike_height = log(1+quantity) × scaleFactor, min 3px
+//   Large liq → glow (shadowBlur 8px)
+// ═══════════════════════════════════════════════════════════════════
+function renderLiquidationSpikes(c, W, H, cW, cH, topM, botM, eLow, eHigh, priceToY, timeScale, fromIdx, toIdx){
+    if(liquidationSpikes.length===0||candleData.length===0) return;
+
+    // Cluster spikes by candle time → {time: {longQty, shortQty, longUsd, shortUsd, longPrice, shortPrice, count}}
+    const clustered = clusterSpikes(fromIdx, toIdx);
+    if(Object.keys(clustered).length===0) return;
+
+    // Find max cluster for normalization
+    let maxQty=0;
+    for(const t in clustered){
+        const cl=clustered[t];
+        if(cl.longQty>maxQty) maxQty=cl.longQty;
+        if(cl.shortQty>maxQty) maxQty=cl.shortQty;
+    }
+    if(maxQty<0.001) return;
+
+    // Spike height: log scale, max = botM*0.7
+    const maxSpikePx=botM*0.7;
+    const logMax=Math.log(1+maxQty);
+
+    for(const t in clustered){
+        const cl=clustered[t];
+        const timeNum=parseInt(t);
+        const xCoord=timeScale.timeToCoordinate(timeNum);
+        if(xCoord===null||xCoord<0||xCoord>cW) continue;
+
+        // Get candle for this time to find high/low
+        const candle=candleData.find(cd=>cd.time===timeNum);
+        if(!candle) continue;
+
+        const candleHighY=priceToY(candle.high);
+        const candleLowY=priceToY(candle.low);
+
+        // Bar width = 60% of estimated candle width
+        const barSpacing=cW/(toIdx-fromIdx+1||1);
+        const spikeW=Math.max(barSpacing*0.6,3);
+
+        // ── Long liquidation → RED spike BELOW candle ──
+        if(cl.longQty>0.001){
+            const sH=Math.max(Math.log(1+cl.longQty)/logMax*maxSpikePx,3);
+            const isLarge=cl.longUsd>50000;
+
+            if(isLarge){
+                c.save();
+                c.shadowColor='rgba(255,23,68,0.6)';
+                c.shadowBlur=8;
+            }
+
+            const grad=c.createLinearGradient(0,candleLowY,0,candleLowY+sH);
+            grad.addColorStop(0,'rgba(255,23,68,0.85)');
+            grad.addColorStop(1,'rgba(255,23,68,0.15)');
+            c.fillStyle=grad;
+            c.fillRect(xCoord-spikeW/2,candleLowY,spikeW,sH);
+
+            // Bright cap line
+            c.fillStyle='rgba(255,23,68,0.95)';
+            c.fillRect(xCoord-spikeW/2,candleLowY,spikeW,Math.min(2,sH));
+
+            if(isLarge) c.restore();
+        }
+
+        // ── Short liquidation → GREEN spike ABOVE candle ──
+        if(cl.shortQty>0.001){
+            const sH=Math.max(Math.log(1+cl.shortQty)/logMax*maxSpikePx,3);
+            const isLarge=cl.shortUsd>50000;
+
+            if(isLarge){
+                c.save();
+                c.shadowColor='rgba(0,200,83,0.6)';
+                c.shadowBlur=8;
+            }
+
+            const grad=c.createLinearGradient(0,candleHighY,0,candleHighY-sH);
+            grad.addColorStop(0,'rgba(0,200,83,0.85)');
+            grad.addColorStop(1,'rgba(0,200,83,0.15)');
+            c.fillStyle=grad;
+            c.fillRect(xCoord-spikeW/2,candleHighY-sH,spikeW,sH);
+
+            c.fillStyle='rgba(0,200,83,0.95)';
+            c.fillRect(xCoord-spikeW/2,candleHighY-Math.min(2,sH),spikeW,Math.min(2,sH));
+
+            if(isLarge) c.restore();
         }
     }
-    const d = hi.s - lo.s || 1;
-    const f = (t - lo.s) / d;
-    return {
-        r: Math.round(lo.r + (hi.r - lo.r) * f),
-        g: Math.round(lo.g + (hi.g - lo.g) * f),
-        b: Math.round(lo.b + (hi.b - lo.b) * f)
-    };
 }
 
-// ─── Crosshair Tooltip ───────────────────────────────────────────
-function onCrosshair(param) {
-    const tip = document.getElementById('tooltip');
-    if (!param || !param.point || !param.time) { tip.style.display = 'none'; return; }
-
-    const candle = param.seriesData?.get(candleSeries);
-    if (!candle) { tip.style.display = 'none'; return; }
-
-    // Find closest bucket to hovered price
-    const hoverY = param.point.y;
-    const box = document.getElementById('chart-container');
-    const H = box.clientHeight;
-    const topM = H * 0.08, botM = H * 0.22, cH = H - topM - botM;
-
-    const ts = chart.timeScale();
-    const vr = ts.getVisibleLogicalRange();
-    if (!vr) { tip.style.display = 'none'; return; }
-    const fromIdx = Math.max(0, Math.floor(vr.from));
-    const toIdx = Math.min(candleData.length - 1, Math.ceil(vr.to));
-    let vH = -Infinity, vL = Infinity;
-    for (let i = fromIdx; i <= toIdx; i++) {
-        if (candleData[i].high > vH) vH = candleData[i].high;
-        if (candleData[i].low  < vL) vL = candleData[i].low;
-    }
-    const pr = vH - vL;
-    if (pr <= 0) { tip.style.display = 'none'; return; }
-    const eH = vH + pr * 0.08, eL = vL - pr * 0.08;
-
-    // Convert Y to price
-    const yFrac = 1 - (hoverY - topM) / cH;
-    const hoverPrice = eL + yFrac * (eH - eL);
-
-    const bucket = findBucket(hoverPrice);
-
-    let html = `<div class="tip-title">${fmtPrice(candle.close)}</div>`;
-    html += `<div><span class="tip-label">O:</span> ${fmtPrice(candle.open)} `;
-    html += `<span class="tip-label">H:</span> ${fmtPrice(candle.high)} `;
-    html += `<span class="tip-label">L:</span> ${fmtPrice(candle.low)} `;
-    html += `<span class="tip-label">C:</span> ${fmtPrice(candle.close)}</div>`;
-
-    if (bucket) {
-        html += '<div class="tip-divider"></div>';
-        html += `<div class="tip-neutral">Fiyat Seviyesi: ${fmtPrice(bucket.priceLevel)}</div>`;
-
-        const pctTotal = (bucket.totalUsd / Math.max(totalLongUsd + totalShortUsd, 1) * 100);
-        html += `<div class="tip-label">Likidasyon Yoğunluğu: ${pctTotal.toFixed(1)}%</div>`;
-        html += `<div class="tip-long">▼ Long Tasfiye: $${fmtCompact(bucket.longUsd)}</div>`;
-        html += `<div class="tip-short">▲ Short Tasfiye: $${fmtCompact(bucket.shortUsd)}</div>`;
-        html += `<div class="tip-neutral">Toplam: $${fmtCompact(bucket.totalUsd)}</div>`;
-
-        if (bucket.priceLow && bucket.priceHigh) {
-            html += `<div class="tip-label">Aralık: ${fmtPrice(bucket.priceLow)} - ${fmtPrice(bucket.priceHigh)}</div>`;
-        }
-
-        // Leverage cluster hint
-        const dist = Math.abs(bucket.priceLevel - markPrice) / markPrice * 100;
-        let levHint = '';
-        if (dist < 1) levHint = '50-125x';
-        else if (dist < 3) levHint = '20-50x';
-        else if (dist < 5) levHint = '10-20x';
-        else if (dist < 10) levHint = '5-10x';
-        else levHint = '2-5x';
-        html += `<div class="tip-label">Tahmini Kaldıraç: ${levHint}</div>`;
-
-        if (bucket.totalUsd / Math.max(...heatmapData.map(b => b.totalUsd), 1) > 0.8) {
-            html += `<div style="color:#FF6B6B;font-weight:bold;margin-top:3px">⚡ AŞIRI BÖLGE</div>`;
-        }
+/**
+ * Cluster liquidation spikes by matching candle time.
+ * Multiple events within same candle → aggregate (Σ quantity).
+ * This ensures max draw calls = number of visible candles.
+ */
+function clusterSpikes(fromIdx, toIdx){
+    const result={};
+    // Build set of visible candle times for fast lookup
+    const candleTimes=new Set();
+    for(let i=fromIdx;i<=toIdx;i++){
+        if(candleData[i]) candleTimes.add(candleData[i].time);
     }
 
-    tip.innerHTML = html;
-    tip.style.display = 'block';
-    let x = param.point.x + 16, y = param.point.y - 10;
-    if (x + 270 > box.clientWidth) x = param.point.x - 270;
-    if (y + 200 > box.clientHeight) y = box.clientHeight - 210;
-    if (y < 0) y = 8;
-    tip.style.left = x + 'px';
-    tip.style.top  = y + 'px';
+    for(const sp of liquidationSpikes){
+        // Find nearest candle time
+        let bestTime=0, bestDist=Infinity;
+        for(let i=fromIdx;i<=toIdx;i++){
+            if(!candleData[i]) continue;
+            const d=Math.abs(candleData[i].time-sp.time);
+            if(d<bestDist){bestDist=d;bestTime=candleData[i].time;}
+        }
+        if(bestTime===0) continue;
+
+        if(!result[bestTime]) result[bestTime]={longQty:0,shortQty:0,longUsd:0,shortUsd:0,count:0};
+        const cl=result[bestTime];
+        cl.count++;
+
+        // side: "BUY" = short liquidated, "SELL" = long liquidated
+        // BUT from user spec: Long liquidation = red spike below, Short liquidation = green spike above
+        if(sp.side==='SELL'||sp.side==='LONG'){
+            // Long position was liquidated
+            cl.longQty+=sp.quantity;
+            cl.longUsd+=sp.usdValue||sp.quantity*sp.price;
+        } else {
+            // Short position was liquidated (BUY / SHORT)
+            cl.shortQty+=sp.quantity;
+            cl.shortUsd+=sp.usdValue||sp.quantity*sp.price;
+        }
+    }
+    return result;
 }
 
-function findBucket(price) {
-    if (heatmapData.length === 0) return null;
-    let best = null, minD = Infinity;
-    for (const b of heatmapData) {
-        const d = Math.abs(b.priceLevel - price);
-        if (d < minD) { minD = d; best = b; }
+// ═══════════════════════════════════════════════════════════════════
+// LAYER 4: Mark Price Dashed Line
+// ═══════════════════════════════════════════════════════════════════
+function renderMarkPriceLine(c, cW, mp, eLow, eHigh, priceToY){
+    if(mp<=eLow||mp>=eHigh) return;
+    const my=priceToY(mp);
+    c.save();
+    c.setLineDash([8,5]);
+    c.strokeStyle='rgba(255,193,7,0.55)';
+    c.lineWidth=1.2;
+    c.beginPath();c.moveTo(0,my);c.lineTo(cW,my);c.stroke();
+    c.setLineDash([]);
+    c.font='bold 10px -apple-system,sans-serif';
+    c.fillStyle='rgba(0,0,0,0.75)';
+    const mpText='Mark '+fmtPrice(mp);
+    const mpW=c.measureText(mpText).width;
+    c.fillRect(4,my-13,mpW+8,16);
+    c.fillStyle='#FFC107';
+    c.fillText(mpText,8,my-1);
+    c.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LAYER 5: Extreme Zone Labels (top 3 densest OI areas)
+// ═══════════════════════════════════════════════════════════════════
+function renderExtremeLabels(c, cW, eLow, eHigh, priceToY, mp){
+    if(heatmapData.length===0) return;
+    let maxTotal=0;
+    for(const b of heatmapData) if(b.totalUsd>maxTotal) maxTotal=b.totalUsd;
+    if(maxTotal<1) return;
+    const normFn=getNormFunc(currentModel);
+
+    const extremes=[];
+    for(const b of heatmapData){
+        if(b.priceLevel<eLow||b.priceLevel>eHigh) continue;
+        const norm=normFn(b.totalUsd/maxTotal);
+        if(norm>0.82) extremes.push({y:priceToY(b.priceLevel),norm,price:b.priceLevel,
+            isAboveMark:b.priceLevel>mp,totalUsd:b.totalUsd});
     }
+    extremes.sort((a,b)=>b.norm-a.norm);
+    const top3=extremes.slice(0,3);
+
+    for(const ez of top3){
+        c.save();
+        c.font='bold 9px -apple-system,BlinkMacSystemFont,sans-serif';
+        const labelText='⚡ EXTREME ZONE';
+        const lw=c.measureText(labelText).width;
+        const lx=cW-lw-16;
+        const ly=ez.y+(ez.isAboveMark?-8:14);
+        c.fillStyle='rgba(0,0,0,0.7)';
+        c.beginPath();c.roundRect(lx-4,ly-10,lw+8,14,3);c.fill();
+        const bc=ez.isAboveMark?`rgba(${SHORT_COLOR.r},${SHORT_COLOR.g},${SHORT_COLOR.b},0.6)`
+            :`rgba(${LONG_COLOR.r},${LONG_COLOR.g},${LONG_COLOR.b},0.6)`;
+        c.strokeStyle=bc;c.lineWidth=0.8;
+        c.beginPath();c.roundRect(lx-4,ly-10,lw+8,14,3);c.stroke();
+        c.fillStyle=ez.isAboveMark?'#FF6B6B':'#69F0AE';
+        c.fillText(labelText,lx,ly);
+        c.font='8px -apple-system,sans-serif';
+        c.fillStyle='#9A8B6E';
+        c.fillText('$'+fmtCompact(ez.totalUsd),lx,ly+11);
+        c.restore();
+    }
+}
+
+// ─── Model Normalization ─────────────────────────────────────────
+function getNormFunc(model){
+    switch(model){
+        case 'Aggressive':   return v=>Math.log(1+v*9)/Math.log(10);
+        case 'Conservative': return v=>Math.sqrt(v);
+        default:             return v=>v;
+    }
+}
+
+// ─── Heat Color Interpolation ────────────────────────────────────
+function heatColor(t){
+    t=Math.max(0,Math.min(1,t));
+    let lo=HEAT_COLORS[0],hi=HEAT_COLORS[HEAT_COLORS.length-1];
+    for(let i=0;i<HEAT_COLORS.length-1;i++){
+        if(t>=HEAT_COLORS[i].s&&t<=HEAT_COLORS[i+1].s){lo=HEAT_COLORS[i];hi=HEAT_COLORS[i+1];break;}
+    }
+    const d=hi.s-lo.s||1;
+    const f=(t-lo.s)/d;
+    return {r:Math.round(lo.r+(hi.r-lo.r)*f),g:Math.round(lo.g+(hi.g-lo.g)*f),b:Math.round(lo.b+(hi.b-lo.b)*f)};
+}
+
+// ─── Debug Overlay ───────────────────────────────────────────────
+function updateDebugOverlay(){
+    const now=Date.now();
+    // Purge entries older than 60s
+    liqCountBuffer=liqCountBuffer.filter(ts=>now-ts<60000);
+    document.getElementById('dbg-long-oi').textContent='$'+fmtCompact(totalLongUsd);
+    document.getElementById('dbg-short-oi').textContent='$'+fmtCompact(totalShortUsd);
+    document.getElementById('dbg-liq-count').textContent=liqCountBuffer.length;
+    document.getElementById('dbg-render-ms').textContent=lastRenderMs.toFixed(1);
+}
+
+// ─── Crosshair Tooltip ──────────────────────────────────────────
+function onCrosshair(param){
+    const tip=document.getElementById('tooltip');
+    if(!param||!param.point||!param.time){tip.style.display='none';return;}
+    const candle=param.seriesData?.get(candleSeries);
+    if(!candle){tip.style.display='none';return;}
+
+    const box=document.getElementById('chart-container');
+    const H=box.clientHeight,W=box.clientWidth;
+    const topM=H*0.08,botM=H*0.22,cH=H-topM-botM;
+    const ts=chart.timeScale();
+    const vr=ts.getVisibleLogicalRange();
+    if(!vr){tip.style.display='none';return;}
+    const fi=Math.max(0,Math.floor(vr.from));
+    const ti=Math.min(candleData.length-1,Math.ceil(vr.to));
+    let vH=-Infinity,vL=Infinity;
+    for(let i=fi;i<=ti;i++){
+        if(!candleData[i]) continue;
+        if(candleData[i].high>vH) vH=candleData[i].high;
+        if(candleData[i].low<vL) vL=candleData[i].low;
+    }
+    if(vH===-Infinity){tip.style.display='none';return;}
+    const pr=vH-vL;if(pr<=0){tip.style.display='none';return;}
+    const eH=vH+pr*0.08,eL=vL-pr*0.08;
+    const yFrac=1-(param.point.y-topM)/cH;
+    const hoverPrice=eL+yFrac*(eH-eL);
+    const bucket=findBucket(hoverPrice);
+
+    // Find spike data for this candle time
+    const candleTime=candle.time;
+    let spikeLongUsd=0,spikeShortUsd=0,spikeCount=0;
+    for(const sp of liquidationSpikes){
+        // Match to nearest candle
+        let best=null,bestD=Infinity;
+        for(let i=fi;i<=ti;i++){
+            if(!candleData[i]) continue;
+            const d=Math.abs(candleData[i].time-sp.time);
+            if(d<bestD){bestD=d;best=candleData[i].time;}
+        }
+        if(best===candleTime){
+            spikeCount++;
+            if(sp.side==='SELL'||sp.side==='LONG') spikeLongUsd+=sp.usdValue||sp.quantity*sp.price;
+            else spikeShortUsd+=sp.usdValue||sp.quantity*sp.price;
+        }
+    }
+
+    let html=`<div class="tip-title">${fmtPrice(candle.close)}</div>`;
+    html+=`<div><span class="tip-label">O:</span> ${fmtPrice(candle.open)} `;
+    html+=`<span class="tip-label">H:</span> ${fmtPrice(candle.high)} `;
+    html+=`<span class="tip-label">L:</span> ${fmtPrice(candle.low)} `;
+    html+=`<span class="tip-label">C:</span> ${fmtPrice(candle.close)}</div>`;
+
+    // OI Cluster info
+    if(bucket){
+        html+='<div class="tip-divider"></div>';
+        html+=`<div class="tip-neutral" style="font-weight:600">📊 Açık Pozisyon Yoğunluğu</div>`;
+        html+=`<div class="tip-neutral">Fiyat: ${fmtPrice(bucket.priceLevel)}</div>`;
+        html+=`<div class="tip-long">▼ Long OI: $${fmtCompact(bucket.longUsd)}</div>`;
+        html+=`<div class="tip-short">▲ Short OI: $${fmtCompact(bucket.shortUsd)}</div>`;
+        html+=`<div class="tip-neutral">Toplam: $${fmtCompact(bucket.totalUsd)}</div>`;
+        if(bucket.priceLow&&bucket.priceHigh){
+            html+=`<div class="tip-label">Aralık: ${fmtPrice(bucket.priceLow)} - ${fmtPrice(bucket.priceHigh)}</div>`;
+        }
+        const dist=Math.abs(bucket.priceLevel-markPrice)/markPrice*100;
+        let lev='2-5x';
+        if(dist<1) lev='50-125x'; else if(dist<3) lev='20-50x';
+        else if(dist<5) lev='10-20x'; else if(dist<10) lev='5-10x';
+        html+=`<div class="tip-label">Tahmini Kaldıraç: ${lev}</div>`;
+        const maxT=Math.max(...heatmapData.map(b=>b.totalUsd),1);
+        if(bucket.totalUsd/maxT>0.8) html+=`<div style="color:#FF6B6B;font-weight:bold;margin-top:3px">⚡ AŞIRI BÖLGE</div>`;
+    }
+
+    // Realized Liquidation info
+    if(spikeCount>0){
+        html+='<div class="tip-divider"></div>';
+        html+=`<div class="tip-neutral" style="font-weight:600">💥 Gerçekleşen Tasfiyeler</div>`;
+        html+=`<div class="tip-label">Bu mumda ${spikeCount} tasfiye</div>`;
+        if(spikeLongUsd>0) html+=`<div class="tip-short">Long Tasfiye: $${fmtCompact(spikeLongUsd)}</div>`;
+        if(spikeShortUsd>0) html+=`<div class="tip-long">Short Tasfiye: $${fmtCompact(spikeShortUsd)}</div>`;
+    }
+
+    tip.innerHTML=html;
+    tip.style.display='block';
+    let x=param.point.x+16,y=param.point.y-10;
+    if(x+290>W) x=param.point.x-290;
+    if(y+220>H) y=H-230;
+    if(y<0) y=8;
+    tip.style.left=x+'px';tip.style.top=y+'px';
+}
+
+function findBucket(price){
+    if(heatmapData.length===0) return null;
+    let best=null,minD=Infinity;
+    for(const b of heatmapData){const d=Math.abs(b.priceLevel-price);if(d<minD){minD=d;best=b;}}
     return best;
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// JS Bridge — called from Android (Kotlin WebView)
+// JS BRIDGE — called from Android (Kotlin WebView)
 // ═══════════════════════════════════════════════════════════════════
 
-function setCandleData(jsonStr) {
-    try {
-        const data = JSON.parse(jsonStr);
-        if (!data || !data.length) return;
-        candleData = data;
-
-        candleSeries.setData(data.map(d => ({
-            time: d.time, open: d.open, high: d.high, low: d.low, close: d.close
-        })));
-        volumeSeries.setData(data.map(d => ({
-            time: d.time, value: d.volume || 0,
-            color: d.close >= d.open ? 'rgba(0,200,83,0.25)' : 'rgba(255,23,68,0.25)'
-        })));
+// ─── Layer A: OI Cluster Data ────────────────────────────────────
+function setCandleData(jsonStr){
+    try{
+        const data=JSON.parse(jsonStr);
+        if(!data||!data.length) return;
+        candleData=data;
+        candleSeries.setData(data.map(d=>({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close})));
+        volumeSeries.setData(data.map(d=>({time:d.time,value:d.volume||0,
+            color:d.close>=d.open?'rgba(0,200,83,0.25)':'rgba(255,23,68,0.25)'})));
         chart.timeScale().fitContent();
-        cacheValid = false;
         scheduleRender();
-    } catch(e) { console.error('setCandleData:', e); }
+    }catch(e){console.error('setCandleData:',e);}
 }
 
-function updateCandle(jsonStr) {
-    try {
-        const d = JSON.parse(jsonStr);
-        candleSeries.update({ time: d.time, open: d.open, high: d.high, low: d.low, close: d.close });
-        volumeSeries.update({
-            time: d.time, value: d.volume || 0,
-            color: d.close >= d.open ? 'rgba(0,200,83,0.25)' : 'rgba(255,23,68,0.25)'
-        });
-        cacheValid = false;
+function updateCandle(jsonStr){
+    try{
+        const d=JSON.parse(jsonStr);
+        candleSeries.update({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close});
+        volumeSeries.update({time:d.time,value:d.volume||0,
+            color:d.close>=d.open?'rgba(0,200,83,0.25)':'rgba(255,23,68,0.25)'});
         scheduleRender();
-    } catch(e) { console.error('updateCandle:', e); }
+    }catch(e){console.error('updateCandle:',e);}
 }
 
-function setHeatmapData(jsonStr) {
-    try {
-        const data = JSON.parse(jsonStr);
-        if (!data || !data.length) return;
-        const maxT = Math.max(...data.map(b => b.totalUsd), 1);
-        heatmapData = data.map(b => ({
-            ...b,
-            norm: b.totalUsd / maxT
-        }));
-        // Compute totals
-        totalLongUsd  = data.reduce((s, b) => s + (b.longUsd || 0), 0);
-        totalShortUsd = data.reduce((s, b) => s + (b.shortUsd || 0), 0);
-        cacheValid = false;
+function setHeatmapData(jsonStr){
+    try{
+        const data=JSON.parse(jsonStr);
+        if(!data||!data.length) return;
+        const maxT=Math.max(...data.map(b=>b.totalUsd),1);
+        heatmapData=data.map(b=>({...b,norm:b.totalUsd/maxT}));
+        totalLongUsd=data.reduce((s,b)=>s+(b.longUsd||0),0);
+        totalShortUsd=data.reduce((s,b)=>s+(b.shortUsd||0),0);
         triggerFade();
         scheduleRender();
-    } catch(e) { console.error('setHeatmapData:', e); }
+    }catch(e){console.error('setHeatmapData:',e);}
 }
 
-function updateHeatmapDelta(jsonStr) {
-    try {
-        const deltas = JSON.parse(jsonStr);
-        if (!deltas || !deltas.length) return;
-        for (const d of deltas) {
-            const ex = heatmapData.find(b => Math.abs(b.priceLevel - d.priceLevel) < 0.01);
-            if (ex) {
-                ex.longUsd  = d.longUsd;
-                ex.shortUsd = d.shortUsd;
-                ex.totalUsd = d.totalUsd;
-            }
+function updateHeatmapDelta(jsonStr){
+    try{
+        const deltas=JSON.parse(jsonStr);
+        if(!deltas||!deltas.length) return;
+        for(const d of deltas){
+            const ex=heatmapData.find(b=>Math.abs(b.priceLevel-d.priceLevel)<0.01);
+            if(ex){ex.longUsd=d.longUsd;ex.shortUsd=d.shortUsd;ex.totalUsd=d.totalUsd;}
         }
-        const maxT = Math.max(...heatmapData.map(b => b.totalUsd), 1);
-        heatmapData.forEach(b => { b.norm = b.totalUsd / maxT; });
-        totalLongUsd  = heatmapData.reduce((s, b) => s + (b.longUsd || 0), 0);
-        totalShortUsd = heatmapData.reduce((s, b) => s + (b.shortUsd || 0), 0);
-        cacheValid = false;
+        const maxT=Math.max(...heatmapData.map(b=>b.totalUsd),1);
+        heatmapData.forEach(b=>{b.norm=b.totalUsd/maxT;});
+        totalLongUsd=heatmapData.reduce((s,b)=>s+(b.longUsd||0),0);
+        totalShortUsd=heatmapData.reduce((s,b)=>s+(b.shortUsd||0),0);
         scheduleRender();
-    } catch(e) { console.error('updateHeatmapDelta:', e); }
+    }catch(e){console.error('updateHeatmapDelta:',e);}
 }
 
-function setMarkPrice(price) {
-    if (price > 0) { markPrice = price; cacheValid = false; scheduleRender(); }
+function setMarkPrice(price){
+    if(price>0){markPrice=price;scheduleRender();}
 }
 
-function setThreshold(value) {
-    currentThreshold = Math.max(0, Math.min(1, value));
-    cacheValid = false;
+function setThreshold(value){
+    currentThreshold=Math.max(0,Math.min(1,value));
     scheduleRender();
 }
 
-function setModel(model) {
-    currentModel = model;
-    cacheValid = false;
+function setModel(model){
+    currentModel=model;
     scheduleRender();
 }
 
-function setLongShortTotals(longUsd, shortUsd) {
-    totalLongUsd  = longUsd;
-    totalShortUsd = shortUsd;
-    document.getElementById('total-long').textContent  = '$' + fmtCompact(longUsd);
-    document.getElementById('total-short').textContent = '$' + fmtCompact(shortUsd);
+function setLongShortTotals(longUsd,shortUsd){
+    totalLongUsd=longUsd;totalShortUsd=shortUsd;
+    document.getElementById('total-long').textContent='$'+fmtCompact(longUsd);
+    document.getElementById('total-short').textContent='$'+fmtCompact(shortUsd);
 }
 
-function setPricePrecision(precision, minMove) {
-    candleSeries.applyOptions({
-        priceFormat: { type: 'price', precision: precision, minMove: minMove }
-    });
+function setPricePrecision(precision,minMove){
+    candleSeries.applyOptions({priceFormat:{type:'price',precision:precision,minMove:minMove}});
 }
 
-function setTimeframe(tf) {
-    if (window.AndroidBridge) window.AndroidBridge.onTimeframeChanged(tf);
+function setTimeframe(tf){
+    if(window.AndroidBridge) window.AndroidBridge.onTimeframeChanged(tf);
 }
 
-// ─── Utility ─────────────────────────────────────────────────────
-function fmtPrice(p) {
-    if (p >= 10000) return '$' + p.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    if (p >= 100) return '$' + p.toFixed(1);
-    if (p >= 1) return '$' + p.toFixed(2);
-    return '$' + p.toFixed(4);
+// ─── Layer B: Realized Liquidation Spikes ────────────────────────
+
+/** Set historical liquidation spikes (bulk load). Resets existing data. */
+function setLiquidationSpikes(jsonStr){
+    try{
+        const data=JSON.parse(jsonStr);
+        if(!data) return;
+        liquidationSpikes=data.slice(-MAX_SPIKES);
+        triggerFade();
+        scheduleRender();
+    }catch(e){console.error('setLiquidationSpikes:',e);}
 }
 
-function fmtCompact(v) {
-    if (v >= 1e9)  return (v / 1e9).toFixed(2) + 'B';
-    if (v >= 1e6)  return (v / 1e6).toFixed(2) + 'M';
-    if (v >= 1e3)  return (v / 1e3).toFixed(1) + 'K';
+/** Add single real-time liquidation spike (from WebSocket). */
+function addLiquidationSpike(jsonStr){
+    try{
+        const sp=JSON.parse(jsonStr);
+        if(!sp) return;
+        liquidationSpikes.push(sp);
+        // FIFO buffer — keep max
+        if(liquidationSpikes.length>MAX_SPIKES) liquidationSpikes.shift();
+        // Track for debug 1-minute count
+        liqCountBuffer.push(Date.now());
+        scheduleRender();
+    }catch(e){console.error('addLiquidationSpike:',e);}
+}
+
+// ─── Debug Mode ──────────────────────────────────────────────────
+
+function setDebugMode(enabled){
+    debugMode=!!enabled;
+    document.getElementById('debug-overlay').style.display=debugMode?'block':'none';
+    if(debugMode) updateDebugOverlay();
+}
+
+// ─── Utilities ───────────────────────────────────────────────────
+function fmtPrice(p){
+    if(p>=10000) return '$'+p.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    if(p>=100) return '$'+p.toFixed(1);
+    if(p>=1) return '$'+p.toFixed(2);
+    return '$'+p.toFixed(4);
+}
+function fmtCompact(v){
+    if(v>=1e9) return (v/1e9).toFixed(2)+'B';
+    if(v>=1e6) return (v/1e6).toFixed(2)+'M';
+    if(v>=1e3) return (v/1e3).toFixed(1)+'K';
     return v.toFixed(0);
 }
 
 // ─── Init ────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', initChart);
-window.addEventListener('resize', () => {
-    if (chart) {
-        const c = document.getElementById('chart-container');
-        chart.applyOptions({ width: c.clientWidth, height: c.clientHeight });
-    }
+window.addEventListener('DOMContentLoaded',initChart);
+window.addEventListener('resize',()=>{
+    if(chart){const c=document.getElementById('chart-container');
+    chart.applyOptions({width:c.clientWidth,height:c.clientHeight});}
 });
 </script>
 </body>
