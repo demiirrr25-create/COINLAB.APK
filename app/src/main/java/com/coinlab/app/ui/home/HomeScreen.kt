@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Token
 import androidx.compose.material3.Card
@@ -74,6 +76,8 @@ import com.coinlab.app.R
 import com.coinlab.app.ui.components.CoinListItem
 import com.coinlab.app.ui.theme.*
 import com.coinlab.app.data.remote.api.FearGreedDataItem
+import com.coinlab.app.data.remote.dto.TrendingCoinDto
+import coil.compose.AsyncImage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -212,6 +216,60 @@ fun HomeScreen(
                         currency = uiState.currency,
                         onClick = { onCoinClick(coin.id) }
                     )
+                }
+            }
+
+            // ── TOP MOVERS SECTION ──────────────────────
+            if (uiState.topGainers.isNotEmpty() || uiState.topLosers.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "\uD83D\uDD25 Top Movers",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(uiState.topGainers + uiState.topLosers, key = { "mover_${it.id}" }) { coin ->
+                            TopMoverChip(
+                                name = coin.name,
+                                symbol = coin.symbol.uppercase(),
+                                change = coin.priceChangePercentage24h,
+                                imageUrl = coin.image,
+                                onClick = { onCoinClick(coin.id) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── TRENDING SECTION ─────────────────────────
+            if (uiState.trendingCoins.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "\uD83D\uDCC8 Trending",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(uiState.trendingCoins, key = { "trend_${it.id}" }) { coin ->
+                            TrendingCoinChip(coin = coin, onClick = { onCoinClick(coin.id) })
+                        }
+                    }
                 }
             }
 
@@ -894,7 +952,14 @@ private fun QuickAccessGrid(
                 onClick = onStakingClick,
                 modifier = Modifier.weight(1f)
             )
-            Spacer(modifier = Modifier.weight(1f))
+            QuickAccessCard(
+                title = "Teknik Analiz",
+                subtitle = "RSI & G\u00f6stergeler",
+                icon = Icons.Filled.QueryStats,
+                gradientColors = listOf(Color(0xFF1A237E), Color(0xFF3949AB)),
+                onClick = onTradingClick,
+                modifier = Modifier.weight(1f)
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
     }
@@ -995,5 +1060,93 @@ private fun formatMarketCapDouble(value: Double, currency: String): String {
         value >= 1_000_000.0 -> "$symbol%.1fM".format(value / 1_000_000.0)
         value >= 1000.0 -> "$symbol%.0f".format(value)
         else -> "$symbol%.2f".format(value)
+    }
+}
+
+@Composable
+private fun TopMoverChip(
+    name: String,
+    symbol: String,
+    change: Double,
+    imageUrl: String,
+    onClick: () -> Unit
+) {
+    val isPositive = change >= 0
+    val changeColor = if (isPositive) SparklineGreen else CoinLabRed
+    val bgColor = changeColor.copy(alpha = 0.08f)
+
+    ElevatedCard(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .background(bgColor)
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = name,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = symbol,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = "%+.2f%%".format(change),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = changeColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrendingCoinChip(
+    coin: TrendingCoinDto,
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .width(120.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AsyncImage(
+                model = coin.large ?: coin.thumb,
+                contentDescription = coin.name,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = coin.symbol.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                text = "#${coin.marketCapRank ?: "-"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

@@ -11,6 +11,7 @@ import com.coinlab.app.domain.model.Coin
 import com.coinlab.app.domain.repository.CoinRepository
 import com.coinlab.app.data.preferences.AuthPreferences
 import com.coinlab.app.data.remote.api.FearGreedDataItem
+import com.coinlab.app.data.remote.dto.TrendingCoinDto
 import com.coinlab.app.data.preferences.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -28,6 +29,9 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val top5Coins: List<Coin> = emptyList(),
+    val topGainers: List<Coin> = emptyList(),
+    val topLosers: List<Coin> = emptyList(),
+    val trendingCoins: List<TrendingCoinDto> = emptyList(),
     val fearGreedValue: Int = 0,
     val fearGreedLabel: String = "",
     val fearGreedHistory: List<FearGreedDataItem> = emptyList(),
@@ -102,6 +106,7 @@ class HomeViewModel @Inject constructor(
                 supervisorScope {
                     launch { loadFearGreedIndex() }
                     launch { loadGlobalData() }
+                    launch { loadTrending() }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -122,11 +127,23 @@ class HomeViewModel @Inject constructor(
                 supervisorScope {
                     launch { loadFearGreedIndex() }
                     launch { loadGlobalData() }
+                    launch { loadTrending() }
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.update { it.copy(isRefreshing = false) }
             }
+        }
+    }
+
+    private suspend fun loadTrending() {
+        try {
+            val trending = coinGeckoApi.getTrending()
+            val coins = trending.coins?.take(7)?.mapNotNull { it.item } ?: emptyList()
+            _uiState.update { it.copy(trendingCoins = coins) }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            android.util.Log.w("HomeVM", "Trending load failed", e)
         }
     }
 
@@ -140,10 +157,15 @@ class HomeViewModel @Inject constructor(
             ).first()
             result.onSuccess { coins ->
                 val top5 = coins.take(5)
+                // Top Movers: sort by absolute 24h change
+                val sorted = coins.filter { it.priceChangePercentage24h != 0.0 }
+                    .sortedByDescending { kotlin.math.abs(it.priceChangePercentage24h) }
+                val gainers = sorted.filter { it.priceChangePercentage24h > 0 }.take(5)
+                val losers = sorted.filter { it.priceChangePercentage24h < 0 }.take(5)
                 symbolIndexMap = top5.withIndex()
                     .associate { (i, coin) -> coin.symbol.lowercase() to i }
                 _uiState.update {
-                    it.copy(top5Coins = top5, error = null)
+                    it.copy(top5Coins = top5, topGainers = gainers, topLosers = losers, error = null)
                 }
                 connectWebSocket()
             }.onFailure { e ->

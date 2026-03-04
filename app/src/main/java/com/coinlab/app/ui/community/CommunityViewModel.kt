@@ -8,6 +8,7 @@ import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.data.remote.api.BinanceApi
 import com.coinlab.app.data.remote.firebase.CommunityRealtimeRepository
 import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
+import com.coinlab.app.data.remote.firebase.PredictionGameRepository
 import com.coinlab.app.data.remote.firebase.model.RealtimeComment
 import com.coinlab.app.data.remote.firebase.model.RealtimePost
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -151,7 +152,8 @@ class CommunityViewModel @Inject constructor(
     private val binanceApi: BinanceApi,
     private val coinRegistry: DynamicCoinRegistry,
     private val communityRepo: CommunityRealtimeRepository,
-    private val authManager: FirebaseAuthManager
+    private val authManager: FirebaseAuthManager,
+    private val predictionGameRepo: PredictionGameRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CommunityUiState())
@@ -313,7 +315,10 @@ class CommunityViewModel @Inject constructor(
                 val userId = _uiState.value.currentUserId
                 if (userId.isEmpty()) return@launch
                 communityRepo.toggleLike(postId, userId)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                android.util.Log.e("CommunityVM", "toggleLike failed", e)
+            }
         }
     }
 
@@ -321,7 +326,10 @@ class CommunityViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 communityRepo.deletePost(postId)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.update { it.copy(errorMessage = "Gönderi silinemedi: ${e.message}") }
+            }
         }
     }
 
@@ -345,7 +353,10 @@ class CommunityViewModel @Inject constructor(
                 val content = _uiState.value.editingContent
                 communityRepo.updatePost(postId, content)
                 _uiState.update { it.copy(editingPostId = null, editingContent = "") }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.update { it.copy(errorMessage = "Düzenleme kaydedilemedi: ${e.message}") }
+            }
         }
     }
 
@@ -417,7 +428,10 @@ class CommunityViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 communityRepo.deleteComment(postId, commentId)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                android.util.Log.e("CommunityVM", "deleteComment failed", e)
+            }
         }
     }
 
@@ -480,7 +494,10 @@ class CommunityViewModel @Inject constructor(
                 val userId = _uiState.value.currentUserId
                 communityRepo.reportPost(postId, userId, reason)
                 _uiState.update { it.copy(showReportDialog = null) }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _uiState.update { it.copy(showReportDialog = null, errorMessage = "Rapor gönderilemedi") }
+            }
         }
     }
 
@@ -595,18 +612,42 @@ class CommunityViewModel @Inject constructor(
     }
 
     private fun loadSampleLeaderboard() {
-        val sampleLeaderboard = listOf(
-            LeaderboardEntry(1, "CryptoTR", badge = "Pro", totalPnl = 47250.0, winRate = 72.5, totalTrades = 156, followers = 2840),
-            LeaderboardEntry(2, "DeFiMaster", badge = "Whale", totalPnl = 38900.0, winRate = 68.0, totalTrades = 203, followers = 1950),
-            LeaderboardEntry(3, "TraderMehmet", badge = "Pro", totalPnl = 31200.0, winRate = 65.3, totalTrades = 178, followers = 1420),
-            LeaderboardEntry(4, "AltcoinHunter", totalPnl = 22800.0, winRate = 60.2, totalTrades = 145, followers = 890),
-            LeaderboardEntry(5, "BlockchainAli", totalPnl = 18500.0, winRate = 58.7, totalTrades = 120, followers = 650),
-            LeaderboardEntry(6, "CryptoAyse", badge = "OG", totalPnl = 15200.0, winRate = 55.0, totalTrades = 98, followers = 520),
-            LeaderboardEntry(7, "DeFiTurk", totalPnl = 12000.0, winRate = 53.4, totalTrades = 88, followers = 380),
-            LeaderboardEntry(8, "SatoshiTR", totalPnl = 9800.0, winRate = 51.2, totalTrades = 75, followers = 290)
-        )
-        _uiState.update { it.copy(leaderboard = sampleLeaderboard) }
+        viewModelScope.launch {
+            try {
+                predictionGameRepo.getLeaderboard().collect { scores ->
+                    val entries = scores.mapIndexed { index, score ->
+                        LeaderboardEntry(
+                            rank = index + 1,
+                            username = score.userName.ifEmpty { "Anonim" },
+                            badge = when {
+                                score.totalScore > 500 -> "Pro"
+                                score.totalScore > 200 -> "OG"
+                                score.streak > 5 -> "Streak"
+                                else -> null
+                            },
+                            totalPnl = score.totalScore.toDouble(),
+                            winRate = score.accuracy,
+                            totalTrades = score.totalCount,
+                            followers = 0
+                        )
+                    }
+                    _uiState.update { it.copy(leaderboard = entries.ifEmpty { fallbackLeaderboard() }) }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                android.util.Log.e("CommunityVM", "loadLeaderboard failed", e)
+                _uiState.update { it.copy(leaderboard = fallbackLeaderboard()) }
+            }
+        }
     }
+
+    private fun fallbackLeaderboard(): List<LeaderboardEntry> = listOf(
+        LeaderboardEntry(1, "CryptoTR", badge = "Pro", totalPnl = 47250.0, winRate = 72.5, totalTrades = 156, followers = 2840),
+        LeaderboardEntry(2, "DeFiMaster", badge = "Whale", totalPnl = 38900.0, winRate = 68.0, totalTrades = 203, followers = 1950),
+        LeaderboardEntry(3, "TraderMehmet", badge = "Pro", totalPnl = 31200.0, winRate = 65.3, totalTrades = 178, followers = 1420),
+        LeaderboardEntry(4, "AltcoinHunter", totalPnl = 22800.0, winRate = 60.2, totalTrades = 145, followers = 890),
+        LeaderboardEntry(5, "BlockchainAli", totalPnl = 18500.0, winRate = 58.7, totalTrades = 120, followers = 650)
+    )
 
     private fun extractMentions(content: String): List<String> {
         val mentionRegex = Regex("@(\\w+)")

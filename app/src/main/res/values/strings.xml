@@ -266,7 +266,7 @@
     <string name="active_alerts">Uyarılar</string>
     <string name="quick_settings">Hızlı Ayarlar</string>
     <string name="settings_desc">Tema, dil, bildirimler</string>
-    <string name="app_version_display">Sürüm 8.2.2</string>
+    <string name="app_version_display">Sürüm 11.0</string>
 
     <!-- v6.0 - Staking -->
     <string name="staking">Staking</string>

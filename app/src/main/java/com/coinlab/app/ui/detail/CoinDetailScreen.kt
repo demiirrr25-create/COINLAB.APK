@@ -80,6 +80,10 @@ import com.coinlab.app.ui.components.PriceChangeIndicator
 import com.coinlab.app.ui.theme.CoinLabGold
 import com.coinlab.app.ui.theme.CoinLabGreen
 import com.coinlab.app.ui.theme.CoinLabRed
+import com.coinlab.app.ui.theme.ProfileGradientStart
+import com.coinlab.app.ui.theme.ProfileGradientEnd
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -175,39 +179,72 @@ fun CoinDetailScreen(
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Price Section
-                        Column(
+                        // Gradient Hero Header
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(ProfileGradientStart, ProfileGradientEnd)
+                                    ),
+                                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                                )
+                                .padding(horizontal = 20.dp, vertical = 20.dp)
                         ) {
-                            // Show live price if available, otherwise static price
-                            val displayPrice = uiState.livePrice ?: (coin.currentPrice[currency] ?: 0.0)
-                            Text(
-                                text = FormatUtils.formatPrice(displayPrice, uiState.currency),
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                PriceChangeIndicator(
-                                    changePercentage = uiState.livePriceChange ?: coin.priceChangePercentage24h,
-                                    showBackground = true
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                AsyncImage(
+                                    model = coin.image,
+                                    contentDescription = coin.name,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.15f)),
+                                    contentScale = ContentScale.Fit
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "24h",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = coin.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
                                 )
-                                if (uiState.livePrice != null) {
+                                Text(
+                                    text = coin.symbol.uppercase(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                val displayPrice = uiState.livePrice ?: (coin.currentPrice[currency] ?: 0.0)
+                                Text(
+                                    text = FormatUtils.formatPrice(displayPrice, uiState.currency),
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    PriceChangeIndicator(
+                                        changePercentage = uiState.livePriceChange ?: coin.priceChangePercentage24h,
+                                        showBackground = true
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "● Canlı",
+                                        text = "24h",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = CoinLabGreen
+                                        color = Color.White.copy(alpha = 0.7f)
                                     )
+                                    if (uiState.livePrice != null) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "● Canlı",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = CoinLabGreen
+                                        )
+                                    }
                                 }
                             }
                         }

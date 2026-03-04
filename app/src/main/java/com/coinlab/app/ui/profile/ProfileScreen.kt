@@ -1,16 +1,19 @@
 package com.coinlab.app.ui.profile
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -34,8 +38,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -53,35 +60,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.coinlab.app.R
-import com.coinlab.app.data.preferences.AuthPreferences
 import com.coinlab.app.ui.theme.*
 
-private val avatarOptions = listOf(
-    "\uD83E\uDDD1\u200D\uD83D\uDCBB", // technologist
-    "\uD83D\uDE80",                     // rocket
-    "\uD83E\uDD16",                     // robot
-    "\uD83E\uDDD9",                     // mage
-    "\uD83D\uDC8E",                     // gem
-    "\uD83D\uDC3B",                     // bear
-    "\uD83D\uDC02",                     // bull/ox
-    "\uD83C\uDF1F",                     // glowing star
-    "\uD83E\uDD8A",                     // fox
-    "\uD83D\uDC09",                     // dragon
-    "\uD83C\uDFAF",                     // target
-    "\u26A1"                            // lightning
-)
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onSettingsClick: () -> Unit = {},
@@ -91,6 +85,12 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.uploadPhoto(it) }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -164,22 +164,83 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .size(80.dp)
                                 .clip(CircleShape)
-                                .background(CoinLabGreen.copy(alpha = 0.2f)),
+                                .then(
+                                    if (uiState.isEditing) Modifier.clickable {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    } else Modifier
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            val displayAvatar = if (uiState.isEditing) uiState.editingAvatar else uiState.avatarEmoji
-                            if (displayAvatar.isNotEmpty()) {
-                                Text(
-                                    text = displayAvatar,
-                                    fontSize = 40.sp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.AccountCircle,
-                                    contentDescription = null,
-                                    tint = CoinLabGreen,
-                                    modifier = Modifier.size(64.dp)
-                                )
+                            when {
+                                uiState.isUploadingPhoto -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(CoinLabGreen.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(32.dp),
+                                            color = CoinLabGreen,
+                                            strokeWidth = 3.dp
+                                        )
+                                    }
+                                }
+                                uiState.avatarUrl.startsWith("http") -> {
+                                    AsyncImage(
+                                        model = uiState.avatarUrl,
+                                        contentDescription = "Avatar",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    if (uiState.isEditing) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.4f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.AddAPhoto,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    // Letter avatar fallback
+                                    val displayName = uiState.displayName
+                                    val letter = displayName.firstOrNull()?.uppercase() ?: "?"
+                                    val bgColor = CoinLabGreen
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        drawCircle(color = bgColor.copy(alpha = 0.2f))
+                                    }
+                                    Text(
+                                        text = letter,
+                                        fontSize = 36.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CoinLabGreen
+                                    )
+                                    if (uiState.isEditing) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.3f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.AddAPhoto,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -237,36 +298,35 @@ fun ProfileScreen(
                         )
                         Spacer(Modifier.height(16.dp))
 
-                        // Avatar Selection
-                        Text(
-                            text = stringResource(R.string.choose_avatar),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        // Photo Upload Button
+                        Button(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CoinLabGreen
+                            ),
+                            enabled = !uiState.isUploadingPhoto,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            avatarOptions.forEach { emoji ->
-                                val isSelected = uiState.editingAvatar == emoji
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isSelected) CoinLabGreen.copy(alpha = 0.2f)
-                                            else MaterialTheme.colorScheme.surfaceVariant
-                                        )
-                                        .then(
-                                            if (isSelected) Modifier.border(2.dp, CoinLabGreen, CircleShape)
-                                            else Modifier
-                                        )
-                                        .clickable { viewModel.selectAvatar(emoji) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = emoji, fontSize = 24.sp)
-                                }
+                            if (uiState.isUploadingPhoto) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Yükleniyor...")
+                            } else {
+                                Icon(
+                                    Icons.Filled.AddAPhoto,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Fotoğraf Seç")
                             }
                         }
                     }

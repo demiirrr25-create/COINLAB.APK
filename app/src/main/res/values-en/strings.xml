@@ -260,7 +260,7 @@
     <string name="active_alerts">Alerts</string>
     <string name="quick_settings">Quick Settings</string>
     <string name="settings_desc">Theme, language, notifications</string>
-    <string name="app_version_display">Version 7.5.2</string>
+    <string name="app_version_display">Version 11.0</string>
 
     <!-- v9.5 - New Features -->
     <string name="ai_assistant">AI Assistant</string>

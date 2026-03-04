@@ -476,7 +476,13 @@ private fun FeedPostCard(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Text(post.authorAvatar ?: "\uD83D\uDC64", fontSize = 18.sp)
+                        // Letter avatar fallback
+                        Text(
+                            text = post.author.firstOrNull()?.uppercase() ?: "?",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CoinLabGreen
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -819,10 +825,21 @@ private fun CommentItemRow(
                 .background(CoinLabPurple.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                comment.authorAvatar.ifEmpty { "\uD83D\uDC64" },
-                fontSize = 13.sp
-            )
+            if (comment.authorAvatar.startsWith("http")) {
+                AsyncImage(
+                    model = comment.authorAvatar,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = comment.authorName.firstOrNull()?.uppercase() ?: "?",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CoinLabPurple
+                )
+            }
         }
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {

@@ -1,19 +1,24 @@
 package com.coinlab.app.ui.profile
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coinlab.app.data.local.dao.PortfolioDao
 import com.coinlab.app.data.local.dao.PriceAlertDao
 import com.coinlab.app.data.local.dao.WatchlistDao
+import com.coinlab.app.data.preferences.AuthPreferences
 import com.coinlab.app.data.preferences.UserPreferences
 import com.coinlab.app.data.remote.firebase.CommunityRealtimeRepository
 import com.coinlab.app.data.remote.firebase.FirebaseAuthManager
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class ProfileUiState(
@@ -22,10 +27,10 @@ data class ProfileUiState(
     val activeAlertsCount: Int = 0,
     val communityPostCount: Int = 0,
     val displayName: String = "",
-    val avatarEmoji: String = "",
+    val avatarUrl: String = "",
     val isEditing: Boolean = false,
     val editingName: String = "",
-    val editingAvatar: String = ""
+    val isUploadingPhoto: Boolean = false
 )
 
 @HiltViewModel
@@ -34,8 +39,11 @@ class ProfileViewModel @Inject constructor(
     private val watchlistDao: WatchlistDao,
     private val priceAlertDao: PriceAlertDao,
     private val userPreferences: UserPreferences,
+    private val authPreferences: AuthPreferences,
     private val communityRepo: CommunityRealtimeRepository,
-    private val authManager: FirebaseAuthManager
+    private val authManager: FirebaseAuthManager,
+    private val storage: FirebaseStorage,
+    private val database: FirebaseDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -49,15 +57,15 @@ class ProfileViewModel @Inject constructor(
     private fun loadProfile() {
         viewModelScope.launch {
             try {
-                userPreferences.displayName.collect { name ->
+                authPreferences.displayName.collect { name ->
                     _uiState.update { it.copy(displayName = name) }
                 }
             } catch (_: Exception) { }
         }
         viewModelScope.launch {
             try {
-                userPreferences.avatarUri.collect { avatar ->
-                    _uiState.update { it.copy(avatarEmoji = avatar) }
+                authPreferences.avatarUrl.collect { url ->
+                    _uiState.update { it.copy(avatarUrl = url) }
                 }
             } catch (_: Exception) { }
         }
@@ -100,8 +108,7 @@ class ProfileViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isEditing = true,
-                editingName = it.displayName,
-                editingAvatar = it.avatarEmoji
+                editingName = it.displayName
             )
         }
     }
@@ -114,24 +121,67 @@ class ProfileViewModel @Inject constructor(
         _uiState.update { it.copy(editingName = name) }
     }
 
-    fun selectAvatar(emoji: String) {
-        _uiState.update { it.copy(editingAvatar = emoji) }
+    /**
+     * Upload photo from gallery to Firebase Storage, save URL to RTDB + preferences.
+     */
+    fun uploadPhoto(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isUploadingPhoto = true) }
+                val userId = authManager.getCurrentUserId()
+                if (userId.isEmpty()) {
+                    _uiState.update { it.copy(isUploadingPhoto = false) }
+                    return@launch
+                }
+
+                // Upload to Firebase Storage
+                val ref = storage.reference.child("avatars/$userId.jpg")
+                ref.putFile(uri).await()
+                val downloadUrl = ref.downloadUrl.await().toString()
+
+                // Save to RTDB user profile node
+                database.reference.child("users").child(userId).updateChildren(
+                    mapOf("avatarUrl" to downloadUrl, "displayName" to _uiState.value.displayName)
+                ).await()
+
+                // Sync to both preference stores
+                authPreferences.updateProfile(_uiState.value.displayName, downloadUrl)
+                userPreferences.setAvatarUri(downloadUrl)
+
+                _uiState.update { it.copy(avatarUrl = downloadUrl, isUploadingPhoto = false) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("ProfileVM", "Photo upload failed", e)
+                _uiState.update { it.copy(isUploadingPhoto = false) }
+            }
+        }
     }
 
     fun saveProfile() {
         viewModelScope.launch {
             try {
                 val state = _uiState.value
+                val userId = authManager.getCurrentUserId()
+
+                // Sync to both preference stores
                 userPreferences.setDisplayName(state.editingName)
-                userPreferences.setAvatarUri(state.editingAvatar)
+                authPreferences.updateProfile(state.editingName, state.avatarUrl)
+
+                // Sync to RTDB user profile node
+                if (userId.isNotEmpty()) {
+                    database.reference.child("users").child(userId).updateChildren(
+                        mapOf("displayName" to state.editingName, "avatarUrl" to state.avatarUrl)
+                    ).await()
+                }
+
                 _uiState.update {
                     it.copy(
                         displayName = state.editingName,
-                        avatarEmoji = state.editingAvatar,
                         isEditing = false
                     )
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update { it.copy(isEditing = false) }
             }
         }
