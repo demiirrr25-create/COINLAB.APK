@@ -34,4 +34,5 @@ sealed class Screen(val route: String) {
     }
     data object PredictionGame : Screen("prediction_game")
     data object SocialTrading : Screen("social_trading")
+    data object LiquidationMap : Screen("liquidation_map")
 }

@@ -74,6 +74,7 @@ import com.coinlab.app.ui.web3.Web3Screen
 import com.coinlab.app.ui.ai.AiAssistantScreen
 import com.coinlab.app.ui.chat.ChatListScreen
 import com.coinlab.app.ui.chat.ChatScreen
+import com.coinlab.app.ui.liquidation.LiquidationMapScreen
 import com.coinlab.app.ui.prediction.PredictionGameScreen
 import com.coinlab.app.ui.trading.SocialTradingScreen
 import com.coinlab.app.ui.theme.CoinLabGreen
@@ -262,6 +263,9 @@ fun CoinLabNavHost(
                     },
                     onTradingClick = {
                         navController.navigate(Screen.SocialTrading.route)
+                    },
+                    onLiquidationMapClick = {
+                        navController.navigate(Screen.LiquidationMap.route)
                     }
                 )
             }
@@ -445,6 +449,13 @@ fun CoinLabNavHost(
             // Staking
             composable(Screen.Staking.route) {
                 StakingScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            // v12.0 — Liquidation Map
+            composable(Screen.LiquidationMap.route) {
+                LiquidationMapScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

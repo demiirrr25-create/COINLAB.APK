@@ -324,4 +324,15 @@
     <string name="channel_messages_desc">P2P mesaj bildirimleri</string>
     <string name="channel_trading">Trading Sinyalleri</string>
     <string name="channel_trading_desc">Sosyal trading sinyal bildirimleri</string>
+
+    <!-- v12.0 Liquidation Map -->
+    <string name="liquidation_map">Likidasyon Haritası</string>
+    <string name="liquidation_subtitle">Isı Haritası</string>
+    <string name="liquidation_open_interest">Açık Pozisyon</string>
+    <string name="liquidation_funding_rate">Fonlama Oranı</string>
+    <string name="liquidation_long_short">Long/Short Oranı</string>
+    <string name="liquidation_recent">Son Likidasyonlar</string>
+    <string name="liquidation_exchange_breakdown">Borsa Dağılımı</string>
+    <string name="liquidation_estimated">Tahmini veri — gerçek zamanlı likidasyon verisi sınırlı</string>
+    <string name="liquidation_threshold">Eşik Değeri</string>
 </resources>

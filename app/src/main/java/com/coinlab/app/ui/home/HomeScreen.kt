@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Token
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -98,6 +99,7 @@ fun HomeScreen(
     onAllMarketClick: () -> Unit = {},
     onPredictionClick: () -> Unit = {},
     onTradingClick: () -> Unit = {},
+    onLiquidationMapClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -292,7 +294,8 @@ fun HomeScreen(
                     onComparisonClick = onComparisonClick,
                     onStakingClick = onStakingClick,
                     onPredictionClick = onPredictionClick,
-                    onTradingClick = onTradingClick
+                    onTradingClick = onTradingClick,
+                    onLiquidationMapClick = onLiquidationMapClick
                 )
             }
         }
@@ -871,7 +874,8 @@ private fun QuickAccessGrid(
     onComparisonClick: () -> Unit,
     onStakingClick: () -> Unit,
     onPredictionClick: () -> Unit = {},
-    onTradingClick: () -> Unit = {}
+    onTradingClick: () -> Unit = {},
+    onLiquidationMapClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -960,6 +964,20 @@ private fun QuickAccessGrid(
                 onClick = onTradingClick,
                 modifier = Modifier.weight(1f)
             )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickAccessCard(
+                title = "Likidasyon",
+                subtitle = "Isı Haritası",
+                icon = Icons.Filled.Whatshot,
+                gradientColors = listOf(Color(0xFF8B0000), Color(0xFFFF4500)),
+                onClick = onLiquidationMapClick,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(8.dp))
     }

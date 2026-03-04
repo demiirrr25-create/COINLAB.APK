@@ -2,10 +2,15 @@ package com.coinlab.app.di
 
 import com.coinlab.app.BuildConfig
 import com.coinlab.app.data.remote.api.BinanceApi
+import com.coinlab.app.data.remote.api.BinanceFuturesApi
+import com.coinlab.app.data.remote.api.BitgetApi
+import com.coinlab.app.data.remote.api.BybitApi
 import com.coinlab.app.data.remote.api.CoinGeckoApi
 import com.coinlab.app.data.remote.api.CryptoCompareApi
 import com.coinlab.app.data.remote.api.FearGreedApi
+import com.coinlab.app.data.remote.api.GateioApi
 import com.coinlab.app.data.remote.api.GitHubApi
+import com.coinlab.app.data.remote.api.OkxApi
 import com.coinlab.app.data.remote.interceptor.BinanceFallbackInterceptor
 import com.coinlab.app.data.remote.interceptor.RateLimitInterceptor
 import dagger.Module
@@ -181,5 +186,92 @@ object NetworkModule {
     @Singleton
     fun provideGitHubApi(@Named("github") retrofit: Retrofit): GitHubApi {
         return retrofit.create(GitHubApi::class.java)
+    }
+
+    // ─── v12.0 — Liquidation Map Exchange APIs ───────────────────────
+
+    @Provides
+    @Singleton
+    @Named("binance_futures")
+    fun provideBinanceFuturesRetrofit(@Named("binance_http") okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://fapi.binance.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("bybit")
+    fun provideBybitRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.bybit.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("okx")
+    fun provideOkxRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://www.okx.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("bitget")
+    fun provideBitgetRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.bitget.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("gateio")
+    fun provideGateioRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.gateio.ws/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBinanceFuturesApi(@Named("binance_futures") retrofit: Retrofit): BinanceFuturesApi {
+        return retrofit.create(BinanceFuturesApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBybitApi(@Named("bybit") retrofit: Retrofit): BybitApi {
+        return retrofit.create(BybitApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkxApi(@Named("okx") retrofit: Retrofit): OkxApi {
+        return retrofit.create(OkxApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBitgetApi(@Named("bitget") retrofit: Retrofit): BitgetApi {
+        return retrofit.create(BitgetApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGateioApi(@Named("gateio") retrofit: Retrofit): GateioApi {
+        return retrofit.create(GateioApi::class.java)
     }
 }
