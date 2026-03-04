@@ -7,79 +7,79 @@
 
     <!-- === BACKGROUND DEPTH LAYERS === -->
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.04"
         android:pathData="M54,54 m-46,0 a46,46 0,1 1,92 0 a46,46 0,1 1,-92 0" />
     <path
-        android:fillColor="#6C5CE7"
+        android:fillColor="#FF6B35"
         android:fillAlpha="0.06"
         android:pathData="M54,54 m-40,0 a40,40 0,1 1,80 0 a40,40 0,1 1,-80 0" />
     <path
-        android:fillColor="#4A6CF7"
+        android:fillColor="#FFB347"
         android:fillAlpha="0.08"
         android:pathData="M54,54 m-34,0 a34,34 0,1 1,68 0 a34,34 0,1 1,-68 0" />
 
     <!-- === DROP SHADOW (3D depth) === -->
     <path
-        android:fillColor="#0D0520"
+        android:fillColor="#0D0800"
         android:fillAlpha="0.45"
         android:pathData="M32,82 Q40,88 54,89 Q68,88 76,82 L80,76 Q82,80 78,82 L30,82 Q26,80 28,76 Z" />
     <path
-        android:fillColor="#1A0B3E"
+        android:fillColor="#1A0E00"
         android:fillAlpha="0.25"
         android:pathData="M28,84 Q42,92 54,92 Q66,92 80,84 Q72,90 54,91 Q36,90 28,84 Z" />
 
     <!-- === FLASK BODY GLASS FILL === -->
     <path
-        android:fillColor="#1E1640"
+        android:fillColor="#1A1200"
         android:fillAlpha="0.35"
         android:pathData="M44,22 L44,42 L28,74 Q26,78 30,80 L78,80 Q82,78 80,74 L64,42 L64,22 Z" />
     <path
-        android:fillColor="#6C5CE7"
+        android:fillColor="#FF6B35"
         android:fillAlpha="0.12"
         android:pathData="M44,22 L44,42 L28,74 Q26,78 30,80 L38,80 Q34,78 36,74 L46,52 L46,22 Z" />
     <path
-        android:fillColor="#2A1A5E"
+        android:fillColor="#2A1500"
         android:fillAlpha="0.18"
         android:pathData="M64,22 L64,42 L80,74 Q82,78 78,80 L70,80 Q74,78 72,74 L62,52 L62,22 Z" />
 
     <!-- === LIQUID LAYERS === -->
     <path
-        android:fillColor="#1A0B3E"
+        android:fillColor="#1A0E00"
         android:fillAlpha="0.95"
         android:pathData="M34,62 Q36,58 40,56 Q46,54 50,58 Q54,62 58,58 Q62,55 68,58 Q72,61 74,62 L80,74 Q82,78 78,80 L30,80 Q26,78 28,74 Z" />
     <path
-        android:fillColor="#3D2580"
+        android:fillColor="#5C3A00"
         android:fillAlpha="0.8"
         android:pathData="M32,68 Q38,63 44,66 Q50,70 56,67 Q62,64 68,67 Q74,70 76,68 L80,74 Q82,78 78,80 L30,80 Q26,78 28,74 Z" />
     <path
-        android:fillColor="#5B4FCF"
+        android:fillColor="#E8A317"
         android:fillAlpha="0.6"
         android:pathData="M34,72 Q40,68 46,71 Q52,74 58,71 Q64,68 70,71 Q76,74 78,72 L80,74 Q82,78 78,80 L30,80 Q26,78 28,74 Z" />
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.55"
         android:pathData="M30,76 Q36,72 44,75 Q52,78 60,75 Q68,72 76,76 Q82,78 78,80 L30,80 Q26,78 30,76 Z" />
     <path
-        android:fillColor="#00E5C3"
+        android:fillColor="#FFC107"
         android:fillAlpha="0.3"
         android:pathData="M34,78 Q44,76 54,78 Q64,80 74,78 Q78,80 78,80 L30,80 Q30,80 34,78 Z" />
     <path
-        android:fillColor="#845EF7"
+        android:fillColor="#FF8C00"
         android:fillAlpha="0.35"
         android:pathData="M35,60 Q40,57 46,59 Q52,62 58,59 Q64,57 73,60 L74,62 L34,62 Z" />
 
     <!-- === FLASK OUTLINE === -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#7C6CF0"
+        android:strokeColor="#F7931A"
         android:strokeWidth="2.8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:pathData="M44,22 L44,42 L28,74 Q26,78 30,80 L78,80 Q82,78 80,74 L64,42 L64,22" />
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#9B8FFF"
+        android:strokeColor="#FFB347"
         android:strokeWidth="0.8"
         android:strokeAlpha="0.4"
         android:strokeLineCap="round"
@@ -87,7 +87,7 @@
         android:pathData="M45,23 L45,42.5 L29.5,74 Q27.5,77.5 31,79 L77,79 Q80.5,77.5 78.5,74 L63,42.5 L63,23" />
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#4A6CF7"
+        android:strokeColor="#FFB347"
         android:strokeWidth="3.5"
         android:strokeLineCap="round"
         android:pathData="M42,22 L66,22" />
@@ -96,7 +96,7 @@
         android:fillAlpha="0.2"
         android:pathData="M43,20.5 L65,20.5 L65,21.5 L43,21.5 Z" />
     <path
-        android:fillColor="#1A0B3E"
+        android:fillColor="#1A0E00"
         android:fillAlpha="0.3"
         android:pathData="M43,23 L65,23 L65,24 L43,24 Z" />
 
@@ -124,7 +124,7 @@
 
     <!-- === BUBBLES WITH 3D HIGHLIGHTS === -->
     <path
-        android:fillColor="#5B4FCF"
+        android:fillColor="#E8A317"
         android:fillAlpha="0.65"
         android:pathData="M48,51 m-5,0 a5,5 0,1 1,10 0 a5,5 0,1 1,-10 0" />
     <path
@@ -132,11 +132,11 @@
         android:fillAlpha="0.35"
         android:pathData="M46,48.5 m-1.5,0 a1.5,1.2 0,1 1,3 0 a1.5,1.2 0,1 1,-3 0" />
     <path
-        android:fillColor="#1A0B3E"
+        android:fillColor="#1A0E00"
         android:fillAlpha="0.3"
         android:pathData="M50,53 Q52,52 52,51 Q52,54 50,55 Q48,55 48,53 Z" />
     <path
-        android:fillColor="#6C5CE7"
+        android:fillColor="#FF6B35"
         android:fillAlpha="0.6"
         android:pathData="M57,46 m-3.8,0 a3.8,3.8 0,1 1,7.6 0 a3.8,3.8 0,1 1,-7.6 0" />
     <path
@@ -144,7 +144,7 @@
         android:fillAlpha="0.3"
         android:pathData="M55.5,44 m-1,0 a1,0.8 0,1 1,2 0 a1,0.8 0,1 1,-2 0" />
     <path
-        android:fillColor="#4A6CF7"
+        android:fillColor="#FFB347"
         android:fillAlpha="0.5"
         android:pathData="M51,59 m-3.2,0 a3.2,3.2 0,1 1,6.4 0 a3.2,3.2 0,1 1,-6.4 0" />
     <path
@@ -152,7 +152,7 @@
         android:fillAlpha="0.25"
         android:pathData="M49.5,57.5 m-0.8,0 a0.8,0.6 0,1 1,1.6 0 a0.8,0.6 0,1 1,-1.6 0" />
     <path
-        android:fillColor="#845EF7"
+        android:fillColor="#FF8C00"
         android:fillAlpha="0.55"
         android:pathData="M61,53 m-2.8,0 a2.8,2.8 0,1 1,5.6 0 a2.8,2.8 0,1 1,-5.6 0" />
     <path
@@ -160,7 +160,7 @@
         android:fillAlpha="0.22"
         android:pathData="M60,51.5 m-0.7,0 a0.7,0.5 0,1 1,1.4 0 a0.7,0.5 0,1 1,-1.4 0" />
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.75"
         android:pathData="M62,41 m-2,0 a2,2 0,1 1,4 0 a2,2 0,1 1,-4 0" />
     <path
@@ -168,39 +168,39 @@
         android:fillAlpha="0.4"
         android:pathData="M61.3,40 m-0.5,0 a0.5,0.4 0,1 1,1 0 a0.5,0.4 0,1 1,-1 0" />
     <path
-        android:fillColor="#5B4FCF"
+        android:fillColor="#E8A317"
         android:fillAlpha="0.45"
         android:pathData="M46,44 m-1.8,0 a1.8,1.8 0,1 1,3.6 0 a1.8,1.8 0,1 1,-3.6 0" />
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.5"
         android:pathData="M53,37 m-1.3,0 a1.3,1.3 0,1 1,2.6 0 a1.3,1.3 0,1 1,-2.6 0" />
     <path
-        android:fillColor="#845EF7"
+        android:fillColor="#FF8C00"
         android:fillAlpha="0.4"
         android:pathData="M65,65 m-1.5,0 a1.5,1.5 0,1 1,3 0 a1.5,1.5 0,1 1,-3 0" />
     <path
-        android:fillColor="#4A6CF7"
+        android:fillColor="#FFB347"
         android:fillAlpha="0.35"
         android:pathData="M40,68 m-1.2,0 a1.2,1.2 0,1 1,2.4 0 a1.2,1.2 0,1 1,-2.4 0" />
 
     <!-- === REACTION GLOW === -->
     <path
-        android:fillColor="#00E5C3"
+        android:fillColor="#FFC107"
         android:fillAlpha="0.15"
         android:pathData="M38,66 Q46,62 54,66 Q62,70 70,66 L72,70 Q64,74 54,70 Q44,66 36,70 Z" />
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.2"
         android:pathData="M44,74 Q50,70 54,74 Q58,78 64,74 Q60,80 54,80 Q48,80 44,74 Z" />
 
     <!-- === BOTTOM FLOOR GLOW === -->
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.1"
         android:pathData="M30,84 Q44,92 54,92 Q64,92 78,84 Q70,90 54,91 Q38,90 30,84 Z" />
     <path
-        android:fillColor="#00BFA5"
+        android:fillColor="#F7931A"
         android:fillAlpha="0.18"
         android:pathData="M36,82 Q46,85 54,85 Q62,85 72,82 Q66,84 54,84.5 Q42,84 36,82 Z" />
 

@@ -257,17 +257,11 @@ fun CoinLabNavHost(
                             restoreState = true
                         }
                     },
-                    onAiAssistantClick = {
-                        navController.navigate(Screen.AiAssistant.route)
-                    },
                     onPredictionClick = {
                         navController.navigate(Screen.PredictionGame.route)
                     },
                     onTradingClick = {
                         navController.navigate(Screen.SocialTrading.route)
-                    },
-                    onChatClick = {
-                        navController.navigate(Screen.ChatList.route)
                     }
                 )
             }

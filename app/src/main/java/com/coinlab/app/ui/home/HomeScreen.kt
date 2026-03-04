@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.CardGiftcard
@@ -38,7 +37,6 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Token
 import androidx.compose.material3.Card
@@ -94,10 +92,8 @@ fun HomeScreen(
     onComparisonClick: () -> Unit = {},
     onStakingClick: () -> Unit = {},
     onAllMarketClick: () -> Unit = {},
-    onAiAssistantClick: () -> Unit = {},
     onPredictionClick: () -> Unit = {},
     onTradingClick: () -> Unit = {},
-    onChatClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -237,10 +233,8 @@ fun HomeScreen(
                     onAirdropClick = onAirdropClick,
                     onComparisonClick = onComparisonClick,
                     onStakingClick = onStakingClick,
-                    onAiAssistantClick = onAiAssistantClick,
                     onPredictionClick = onPredictionClick,
-                    onTradingClick = onTradingClick,
-                    onChatClick = onChatClick
+                    onTradingClick = onTradingClick
                 )
             }
         }
@@ -818,10 +812,8 @@ private fun QuickAccessGrid(
     onAirdropClick: () -> Unit,
     onComparisonClick: () -> Unit,
     onStakingClick: () -> Unit,
-    onAiAssistantClick: () -> Unit = {},
     onPredictionClick: () -> Unit = {},
-    onTradingClick: () -> Unit = {},
-    onChatClick: () -> Unit = {}
+    onTradingClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -853,14 +845,6 @@ private fun QuickAccessGrid(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             QuickAccessCard(
-                title = "AI Asistan",
-                subtitle = "Gemini Analiz",
-                icon = Icons.Filled.Psychology,
-                gradientColors = listOf(Color(0xFFFF6B35), Color(0xFFFFC107)),
-                onClick = onAiAssistantClick,
-                modifier = Modifier.weight(1f)
-            )
-            QuickAccessCard(
                 title = "Tahmin Oyunu",
                 subtitle = "Fiyat Tahmini",
                 icon = Icons.Filled.Casino,
@@ -868,25 +852,12 @@ private fun QuickAccessGrid(
                 onClick = onPredictionClick,
                 modifier = Modifier.weight(1f)
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
             QuickAccessCard(
                 title = "Sosyal Trading",
                 subtitle = "Sinyaller",
                 icon = Icons.Filled.Insights,
                 gradientColors = listOf(Color(0xFF2A1500), Color(0xFFFF6B35)),
                 onClick = onTradingClick,
-                modifier = Modifier.weight(1f)
-            )
-            QuickAccessCard(
-                title = "Mesajlar",
-                subtitle = "P2P Sohbet",
-                icon = Icons.AutoMirrored.Filled.Chat,
-                gradientColors = listOf(Color(0xFF1A0E00), Color(0xFFE8A317)),
-                onClick = onChatClick,
                 modifier = Modifier.weight(1f)
             )
         }
