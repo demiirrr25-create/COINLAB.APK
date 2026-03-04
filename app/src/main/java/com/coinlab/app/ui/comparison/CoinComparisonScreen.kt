@@ -55,8 +55,8 @@ import com.coinlab.app.ui.components.PriceChangeIndicator
 import com.coinlab.app.ui.components.SparklineChart
 import com.coinlab.app.ui.theme.CoinLabBlue
 import com.coinlab.app.ui.theme.CoinLabGold
-import com.coinlab.app.ui.theme.CoinLabGreen
 import com.coinlab.app.ui.theme.CoinLabRed
+import com.coinlab.app.ui.theme.SparklineGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -234,22 +234,22 @@ fun CoinComparisonScreen(
                                 label = "24h %",
                                 value1 = FormatUtils.formatPercentage(coin1.priceChangePercentage24h),
                                 value2 = FormatUtils.formatPercentage(coin2.priceChangePercentage24h),
-                                value1Color = if (coin1.priceChangePercentage24h >= 0) CoinLabGreen else CoinLabRed,
-                                value2Color = if (coin2.priceChangePercentage24h >= 0) CoinLabGreen else CoinLabRed
+                                value1Color = if (coin1.priceChangePercentage24h >= 0) SparklineGreen else CoinLabRed,
+                                value2Color = if (coin2.priceChangePercentage24h >= 0) SparklineGreen else CoinLabRed
                             )
                             ComparisonRow(
                                 label = "7d %",
                                 value1 = FormatUtils.formatPercentage(coin1.priceChangePercentage7d),
                                 value2 = FormatUtils.formatPercentage(coin2.priceChangePercentage7d),
-                                value1Color = if (coin1.priceChangePercentage7d >= 0) CoinLabGreen else CoinLabRed,
-                                value2Color = if (coin2.priceChangePercentage7d >= 0) CoinLabGreen else CoinLabRed
+                                value1Color = if (coin1.priceChangePercentage7d >= 0) SparklineGreen else CoinLabRed,
+                                value2Color = if (coin2.priceChangePercentage7d >= 0) SparklineGreen else CoinLabRed
                             )
                             ComparisonRow(
                                 label = "30d %",
                                 value1 = FormatUtils.formatPercentage(coin1.priceChangePercentage30d),
                                 value2 = FormatUtils.formatPercentage(coin2.priceChangePercentage30d),
-                                value1Color = if (coin1.priceChangePercentage30d >= 0) CoinLabGreen else CoinLabRed,
-                                value2Color = if (coin2.priceChangePercentage30d >= 0) CoinLabGreen else CoinLabRed
+                                value1Color = if (coin1.priceChangePercentage30d >= 0) SparklineGreen else CoinLabRed,
+                                value2Color = if (coin2.priceChangePercentage30d >= 0) SparklineGreen else CoinLabRed
                             )
                             ComparisonRow(
                                 label = stringResource(R.string.rank),

@@ -40,7 +40,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.coinlab.app.R
 import com.coinlab.app.domain.model.PortfolioEntry
 import com.coinlab.app.domain.model.TransactionType
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 import kotlinx.coroutines.launch
 
@@ -190,7 +190,7 @@ fun AddTransactionScreen(
                     .height(56.dp),
                 enabled = amount.toDoubleOrNull() != null && price.toDoubleOrNull() != null,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (transactionType == TransactionType.BUY) CoinLabGreen else CoinLabRed
+                    containerColor = if (transactionType == TransactionType.BUY) SparklineGreen else CoinLabRed
                 )
             ) {
                 Text(

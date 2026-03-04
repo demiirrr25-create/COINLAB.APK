@@ -57,7 +57,7 @@ import coil.compose.AsyncImage
 import com.coinlab.app.R
 import com.coinlab.app.data.local.entity.PriceAlertEntity
 import com.coinlab.app.ui.components.FormatUtils
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -294,13 +294,13 @@ private fun AlertItem(
                         imageVector = if (alert.isAbove) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = if (alert.isAbove) CoinLabGreen else CoinLabRed
+                        tint = if (alert.isAbove) SparklineGreen else CoinLabRed
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (alert.isAbove) stringResource(R.string.alert_above) else stringResource(R.string.alert_below),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (alert.isAbove) CoinLabGreen else CoinLabRed
+                        color = if (alert.isAbove) SparklineGreen else CoinLabRed
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -314,7 +314,7 @@ private fun AlertItem(
                     Text(
                         text = "✅ ${stringResource(R.string.alert_triggered)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = CoinLabGreen
+                        color = SparklineGreen
                     )
                 }
             }

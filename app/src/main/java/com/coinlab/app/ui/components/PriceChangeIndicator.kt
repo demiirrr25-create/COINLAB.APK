@@ -16,7 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 import java.util.Locale
 
@@ -27,7 +27,7 @@ fun PriceChangeIndicator(
     showBackground: Boolean = false
 ) {
     val isPositive = changePercentage >= 0
-    val color = if (isPositive) CoinLabGreen else CoinLabRed
+    val color = if (isPositive) SparklineGreen else CoinLabRed
     val icon = if (isPositive) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
     val text = String.format(Locale.US, "%.2f%%", kotlin.math.abs(changePercentage))
 

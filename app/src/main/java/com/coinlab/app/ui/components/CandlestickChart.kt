@@ -15,14 +15,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import com.coinlab.app.domain.model.OhlcData
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 
 @Composable
 fun CandlestickChart(
     data: List<OhlcData>,
     modifier: Modifier = Modifier,
-    bullColor: Color = CoinLabGreen,
+    bullColor: Color = SparklineGreen,
     bearColor: Color = CoinLabRed,
     overlayLines: List<OverlayLine> = emptyList()
 ) {

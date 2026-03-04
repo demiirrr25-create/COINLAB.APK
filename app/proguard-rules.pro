@@ -1,5 +1,6 @@
 -optimizationpasses 5
 -dontusemixedcaseclassnames
+-dontoptimize
 -verbose
 
 # Retrofit
@@ -92,3 +93,22 @@
 -keep class com.coinlab.app.data.remote.DynamicCoinRegistry$CoinMeta { *; }
 -keep class com.coinlab.app.data.remote.HardcodedCoinFallback$FallbackCoinEntry { *; }
 -keep class com.coinlab.app.data.remote.BinanceCoinMapper { *; }
+
+# v8.9.2 — Firebase Realtime Database models
+-keep class com.coinlab.app.data.remote.firebase.model.** { *; }
+-keepclassmembers class com.coinlab.app.data.remote.firebase.model.** {
+    <init>();
+    <fields>;
+}
+
+# v8.9.2 — Firebase general
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# v8.9.2 — Credential Manager / Google Sign-In
+-keep class androidx.credentials.** { *; }
+-dontwarn androidx.credentials.**
+-keep class com.google.android.libraries.identity.** { *; }
+-dontwarn com.google.android.libraries.identity.**

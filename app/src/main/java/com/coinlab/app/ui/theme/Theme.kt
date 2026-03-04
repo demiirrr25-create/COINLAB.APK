@@ -10,22 +10,27 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+// ═══════════════════════════════════════════════════════════════════════
+//  v8.9.2 — GOLD-ORANGE GLASSMORPHISM THEME
+// ═══════════════════════════════════════════════════════════════════════
+
 private val DarkColorScheme = darkColorScheme(
-    primary = CoinLabGreen,
-    onPrimary = DarkBackground,
+    primary = CoinLabGreen,                              // Bitcoin Gold
+    onPrimary = Color(0xFF1A0E00),                       // Dark on gold
     primaryContainer = CoinLabGreen.copy(alpha = 0.2f),
-    onPrimaryContainer = CoinLabGreen,
-    secondary = CoinLabAqua,
-    onSecondary = DarkBackground,
+    onPrimaryContainer = CoinLabGold,
+    secondary = CoinLabAqua,                             // Warm Amber
+    onSecondary = Color(0xFF1A0E00),
     secondaryContainer = CoinLabAqua.copy(alpha = 0.2f),
     onSecondaryContainer = CoinLabAqua,
-    tertiary = CoinLabNeon,
-    onTertiary = DarkBackground,
+    tertiary = CoinLabNeon,                              // Neon Orange
+    onTertiary = Color(0xFF1A0E00),
     background = DarkBackground,
     onBackground = DarkOnBackground,
     surface = DarkSurface,
@@ -34,18 +39,21 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
     error = CoinLabRed,
-    onError = DarkBackground
+    onError = Color(0xFF1A0E00),
+    inverseSurface = Color(0xFFFFE0B2),
+    inverseOnSurface = Color(0xFF1A0E00),
+    inversePrimary = Color(0xFF8B5E00)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = CoinLabGreen,
+    primary = Color(0xFFE68A00),                         // Slightly darker gold for light theme
     onPrimary = LightSurface,
-    primaryContainer = CoinLabGreen.copy(alpha = 0.1f),
-    onPrimaryContainer = CoinLabGreen,
-    secondary = CoinLabAqua,
+    primaryContainer = CoinLabGreen.copy(alpha = 0.12f),
+    onPrimaryContainer = Color(0xFF8B5E00),
+    secondary = Color(0xFFE09000),
     onSecondary = LightSurface,
-    secondaryContainer = CoinLabAqua.copy(alpha = 0.1f),
-    onSecondaryContainer = CoinLabAqua,
+    secondaryContainer = CoinLabAqua.copy(alpha = 0.12f),
+    onSecondaryContainer = Color(0xFF8B5E00),
     tertiary = CoinLabNeon,
     onTertiary = LightSurface,
     background = LightBackground,

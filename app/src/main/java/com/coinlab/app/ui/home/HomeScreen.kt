@@ -337,11 +337,11 @@ private fun AnimatedFlaskIcon(modifier: Modifier = Modifier) {
         label = "b5"
     )
 
-    val purple = Color(0xFF6C5CE7)
-    val teal = Color(0xFF00BFA5)
-    val deepPurple = Color(0xFF2A1A5E)
-    val midPurple = Color(0xFF5B4FCF)
-    val blue = Color(0xFF4A6CF7)
+val purple = Color(0xFFF7931A)       // Bitcoin Gold (was purple)
+        val teal = Color(0xFFFFB347)         // Warm Amber (was teal)
+        val deepPurple = Color(0xFF2A1500)   // Dark burnt (was deep purple)
+        val midPurple = Color(0xFFFF9800)    // Orange glow (was mid purple)
+        val blue = Color(0xFFE8A317)         // Deep Gold (was blue)
 
     Canvas(modifier = modifier) {
         val w = size.width
@@ -486,7 +486,7 @@ private fun MarketSummaryCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (marketCapChangePercent24h != 0.0) {
-                    val changeColor = if (marketCapChangePercent24h >= 0) CoinLabGreen else CoinLabRed
+                    val changeColor = if (marketCapChangePercent24h >= 0) SparklineGreen else CoinLabRed
                     Text(
                         text = "%+.2f%% 24h".format(marketCapChangePercent24h),
                         style = MaterialTheme.typography.labelSmall,
@@ -890,7 +890,22 @@ private fun QuickAccessCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(brush = Brush.linearGradient(gradientColors))
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            gradientColors.first().copy(alpha = 0.25f),
+                            gradientColors.last().copy(alpha = 0.10f)
+                        )
+                    )
+                )
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent
+                        )
+                    )
+                )
                 .padding(14.dp)
         ) {
             Column(
@@ -901,7 +916,9 @@ private fun QuickAccessCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.2f)),
+                        .background(
+                            brush = Brush.linearGradient(gradientColors.map { it.copy(alpha = 0.5f) })
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -916,13 +933,13 @@ private fun QuickAccessCard(
                         text = title,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = CoinLabGold,
                         maxLines = 1
                     )
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = Color.White.copy(alpha = 0.7f),
                         maxLines = 1
                     )
                 }

@@ -56,7 +56,7 @@ import com.coinlab.app.ui.components.OverlayLine
 import com.coinlab.app.ui.components.SparklineChart
 import com.coinlab.app.ui.theme.CoinLabBlue
 import com.coinlab.app.ui.theme.CoinLabGold
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabPurple
 import com.coinlab.app.ui.theme.CoinLabRed
 
@@ -109,7 +109,7 @@ fun TechnicalAnalysisScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = when (uiState.signalType) {
-                            SignalType.BUY -> CoinLabGreen.copy(alpha = 0.1f)
+                            SignalType.BUY -> SparklineGreen.copy(alpha = 0.1f)
                             SignalType.SELL -> CoinLabRed.copy(alpha = 0.1f)
                             SignalType.NEUTRAL -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         }
@@ -130,7 +130,7 @@ fun TechnicalAnalysisScreen(
                             },
                             contentDescription = null,
                             tint = when (uiState.signalType) {
-                                SignalType.BUY -> CoinLabGreen
+                                SignalType.BUY -> SparklineGreen
                                 SignalType.SELL -> CoinLabRed
                                 SignalType.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
@@ -148,7 +148,7 @@ fun TechnicalAnalysisScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = when (uiState.signalType) {
-                                    SignalType.BUY -> CoinLabGreen
+                                    SignalType.BUY -> SparklineGreen
                                     SignalType.SELL -> CoinLabRed
                                     SignalType.NEUTRAL -> MaterialTheme.colorScheme.onSurface
                                 }
@@ -281,7 +281,7 @@ fun TechnicalAnalysisScreen(
                                 )
                                 latestRsi?.let {
                                     val rsiColor = when {
-                                        it < 30 -> CoinLabGreen
+                                        it < 30 -> SparklineGreen
                                         it > 70 -> CoinLabRed
                                         else -> MaterialTheme.colorScheme.onSurface
                                     }
@@ -302,7 +302,7 @@ fun TechnicalAnalysisScreen(
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp)),
                                     color = when {
-                                        it < 30 -> CoinLabGreen
+                                        it < 30 -> SparklineGreen
                                         it > 70 -> CoinLabRed
                                         else -> CoinLabBlue
                                     },
@@ -313,7 +313,7 @@ fun TechnicalAnalysisScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Aşırı Satım (<30)", style = MaterialTheme.typography.labelSmall, color = CoinLabGreen)
+                                    Text("Aşırı Satım (<30)", style = MaterialTheme.typography.labelSmall, color = SparklineGreen)
                                     Text("Aşırı Alım (>70)", style = MaterialTheme.typography.labelSmall, color = CoinLabRed)
                                 }
                             }
@@ -363,7 +363,7 @@ fun TechnicalAnalysisScreen(
                                 MacdValueItem("MACD", latestMacd, CoinLabBlue)
                                 MacdValueItem("Signal", latestSignalLine, CoinLabGold)
                                 MacdValueItem("Histogram", latestHist,
-                                    if ((latestHist ?: 0.0) >= 0) CoinLabGreen else CoinLabRed
+                                    if ((latestHist ?: 0.0) >= 0) SparklineGreen else CoinLabRed
                                 )
                             }
                         }
@@ -491,5 +491,5 @@ private fun fearGreedColor(value: Int): Color = when {
     value <= 45 -> Color(0xFFFF9800)
     value <= 55 -> CoinLabGold
     value <= 75 -> Color(0xFF8BC34A)
-    else -> CoinLabGreen
+    else -> SparklineGreen
 }

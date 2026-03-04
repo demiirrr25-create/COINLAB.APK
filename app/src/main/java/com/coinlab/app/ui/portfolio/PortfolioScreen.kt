@@ -46,7 +46,7 @@ import coil.compose.AsyncImage
 import com.coinlab.app.R
 import com.coinlab.app.ui.components.FormatUtils
 import com.coinlab.app.ui.components.PriceChangeIndicator
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,14 +104,14 @@ fun PortfolioScreen(
                         Icon(
                             imageVector = if (isProfit) Icons.Filled.TrendingUp else Icons.Filled.TrendingDown,
                             contentDescription = null,
-                            tint = if (isProfit) CoinLabGreen else CoinLabRed,
+                            tint = if (isProfit) SparklineGreen else CoinLabRed,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "${FormatUtils.formatPrice(kotlin.math.abs(uiState.totalPnl), uiState.currency)} (${FormatUtils.formatPercentage(uiState.totalPnlPercentage)})",
                             style = MaterialTheme.typography.titleSmall,
-                            color = if (isProfit) CoinLabGreen else CoinLabRed,
+                            color = if (isProfit) SparklineGreen else CoinLabRed,
                             fontWeight = FontWeight.SemiBold
                         )
                     }

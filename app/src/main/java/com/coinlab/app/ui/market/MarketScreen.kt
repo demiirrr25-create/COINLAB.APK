@@ -55,7 +55,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
-import com.coinlab.app.ui.theme.CoinLabGreen
+import com.coinlab.app.ui.theme.SparklineGreen
 import com.coinlab.app.ui.theme.CoinLabRed
 import com.coinlab.app.ui.theme.CoinLabAqua
 import com.coinlab.app.ui.theme.CoinLabGold
@@ -405,7 +405,7 @@ fun MarketScreen(
                                                     .weight(1f)
                                                     .padding(vertical = 4.dp)
                                             ) {
-                                                val changeColor = if (uiState.marketCapChange24h >= 0) CoinLabGreen else CoinLabRed
+                                                val changeColor = if (uiState.marketCapChange24h >= 0) SparklineGreen else CoinLabRed
                                                 Box(
                                                     modifier = Modifier
                                                         .size(40.dp)

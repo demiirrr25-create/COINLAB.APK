@@ -112,6 +112,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -123,6 +124,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.coinlab.app.ui.theme.*
 import java.io.File
 import java.io.FileOutputStream
@@ -309,7 +311,7 @@ private fun ChannelsContent(uiState: CommunityUiState, viewModel: CommunityViewM
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        items(uiState.channels) { channel ->
+        items(uiState.channels, key = { it.id }) { channel ->
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -591,15 +593,35 @@ private fun FeedPostCard(
             // ── Image ──
             if (!post.imageUrl.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                AsyncImage(
-                    model = post.imageUrl,
-                    contentDescription = "G\u00f6nderi resmi",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .aspectRatio(16f / 9f),
-                    contentScale = ContentScale.Crop
-                )
+                if (post.imageUrl.startsWith("data:image/")) {
+                    // Base64 encoded image
+                    val base64Data = post.imageUrl.substringAfter("base64,")
+                    val bytes = android.util.Base64.decode(base64Data, android.util.Base64.NO_WRAP)
+                    val bitmap = remember(post.imageUrl) {
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
+                    if (bitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Gönderi resmi",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .aspectRatio(16f / 9f),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model = post.imageUrl,
+                        contentDescription = "Gönderi resmi",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .aspectRatio(16f / 9f),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1501,7 +1523,7 @@ private fun SignalsContent(uiState: CommunityUiState) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
-            items(uiState.signals) { signal ->
+            items(uiState.signals, key = { it.id }) { signal ->
                 SignalCard(signal)
             }
         }
@@ -1642,7 +1664,7 @@ private fun LeaderboardContent(uiState: CommunityUiState) {
         // Remaining entries
         val remaining = if (uiState.leaderboard.size > 3) uiState.leaderboard.drop(3)
         else uiState.leaderboard
-        items(remaining) { entry ->
+        items(remaining, key = { it.rank }) { entry ->
             LeaderboardItem(entry)
         }
     }

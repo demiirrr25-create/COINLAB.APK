@@ -1,6 +1,10 @@
 package com.coinlab.app.data.remote.firebase
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import com.coinlab.app.data.remote.firebase.model.RealtimeChannel
 import com.coinlab.app.data.remote.firebase.model.RealtimeComment
 import com.coinlab.app.data.remote.firebase.model.RealtimePost
@@ -12,6 +16,7 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.FirebaseStorage
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.tasks.await
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,6 +49,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class CommunityRealtimeRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: FirebaseDatabase,
     private val storage: FirebaseStorage
 ) {
@@ -426,17 +433,89 @@ class CommunityRealtimeRepository @Inject constructor(
 
     /**
      * Upload an image to Firebase Storage and return the download URL.
+     * Falls back to Base64 encoding stored directly in RTDB if Storage fails.
      */
     suspend fun uploadImage(imageUri: Uri): String {
-        return try {
+        // First try Firebase Storage
+        try {
             val fileName = "community/${UUID.randomUUID()}.jpg"
             val ref = storage.reference.child(fileName)
             ref.putFile(imageUri).await()
-            ref.downloadUrl.await().toString()
+            val url = ref.downloadUrl.await().toString()
+            android.util.Log.d("CommunityRTDB", "Image uploaded to Storage: $url")
+            return url
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            android.util.Log.w("CommunityRTDB", "Storage upload failed, falling back to Base64: ${e.message}")
+        }
+
+        // Fallback: compress and encode as Base64 data URI
+        return try {
+            compressAndEncodeImage(imageUri)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            android.util.Log.e("CommunityRTDB", "Base64 encoding also failed: ${e.message}", e)
             ""
         }
+    }
+
+    /**
+     * Compress an image and encode it as a Base64 data URI string.
+     * Max dimension 800px, JPEG quality 50.
+     */
+    private fun compressAndEncodeImage(imageUri: Uri): String {
+        val inputStream = context.contentResolver.openInputStream(imageUri)
+            ?: throw IllegalStateException("Cannot open image URI")
+
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeStream(inputStream, null, options)
+        inputStream.close()
+
+        // Calculate sample size for max 800px
+        val maxDim = 800
+        var sampleSize = 1
+        val w = options.outWidth
+        val h = options.outHeight
+        if (w > maxDim || h > maxDim) {
+            val halfW = w / 2
+            val halfH = h / 2
+            while (halfW / sampleSize >= maxDim && halfH / sampleSize >= maxDim) {
+                sampleSize *= 2
+            }
+        }
+
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val stream2 = context.contentResolver.openInputStream(imageUri)
+            ?: throw IllegalStateException("Cannot reopen image URI")
+        val bitmap = BitmapFactory.decodeStream(stream2, null, decodeOpts)
+        stream2.close()
+
+        if (bitmap == null) throw IllegalStateException("Failed to decode bitmap")
+
+        // Scale down if still too large
+        val scale = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+            maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
+        } else 1f
+
+        val finalBitmap = if (scale < 1f) {
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt(),
+                (bitmap.height * scale).toInt(),
+                true
+            )
+        } else bitmap
+
+        val baos = ByteArrayOutputStream()
+        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 50, baos)
+        val bytes = baos.toByteArray()
+        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+        if (finalBitmap != bitmap) finalBitmap.recycle()
+        bitmap.recycle()
+
+        android.util.Log.d("CommunityRTDB", "Image encoded as Base64: ${bytes.size} bytes -> ${base64.length} chars")
+        return "data:image/jpeg;base64,$base64"
     }
 
     // ─── MENTION SEARCH ─────────────────────────────────────────────────
