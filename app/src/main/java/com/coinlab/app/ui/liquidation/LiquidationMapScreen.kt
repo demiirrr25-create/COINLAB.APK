@@ -1,18 +1,20 @@
 package com.coinlab.app.ui.liquidation
 
+import android.annotation.SuppressLint
+import android.view.ViewGroup
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,54 +28,33 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.coinlab.app.R
 import com.coinlab.app.data.remote.firebase.ExchangeData
-import com.coinlab.app.data.remote.firebase.HeatmapBucket
 import com.coinlab.app.data.remote.firebase.LiqSide
 import com.coinlab.app.data.remote.firebase.LiquidationEvent
 import com.coinlab.app.ui.theme.*
 import java.text.NumberFormat
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════
-// Heatmap Color Palette
+// v12.1 — Professional Liquidation Map with TradingView WebView Chart
 // ═══════════════════════════════════════════════════════════════════════
 
-private val HeatmapLongLow = Color(0xFF1B3A1B)       // Dark green
-private val HeatmapLongMid = Color(0xFF00C853)        // Bright green
-private val HeatmapLongHigh = Color(0xFFB2FF59)       // Yellow-green
-
-private val HeatmapShortLow = Color(0xFF3A1B1B)       // Dark red
-private val HeatmapShortMid = Color(0xFFFF1744)       // Bright red
-private val HeatmapShortHigh = Color(0xFFFF8A80)       // Light red
-
-private val HeatmapNeutral = Color(0xFF1A1A2E)        // Deep dark blue
-private val HeatmapGrid = Color(0xFF2A2A3E)            // Grid line color
-private val HeatmapText = Color(0xFF8888AA)            // Axis text
-private val HeatmapMarkLine = Color(0xFFFFC107)        // Mark price line (gold)
-
-// ═══════════════════════════════════════════════════════════════════════
-// Main Screen
-// ═══════════════════════════════════════════════════════════════════════
+private val HeatmapText = Color(0xFF8888AA)
+private val HeatmapGrid = Color(0xFF2A2A3E)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +80,15 @@ fun LiquidationMapScreen(
                             stringResource(R.string.liquidation_map),
                             fontWeight = FontWeight.Bold
                         )
+                        if (uiState.wsConnected) {
+                            Spacer(Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(SparklineGreen)
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -107,6 +97,15 @@ fun LiquidationMapScreen(
                     }
                 },
                 actions = {
+                    if (uiState.markPrice > 0) {
+                        Text(
+                            "$${formatNumber(uiState.markPrice)}",
+                            color = CoinLabGold,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(
                             Icons.Filled.Refresh,
@@ -152,29 +151,16 @@ fun LiquidationMapScreen(
                 // Time filter chips
                 item { TimeFilterRow(uiState.timeFilter, viewModel.timeFilters, viewModel::setTimeFilter) }
 
-                // Main Heatmap
+                // Professional WebView Chart
                 item {
-                    HeatmapCard(
-                        buckets = uiState.aggregatedData?.heatmapBuckets ?: emptyList(),
-                        markPrice = uiState.aggregatedData?.markPrice ?: 0.0,
-                        selectedIndex = uiState.selectedBucketIndex,
-                        threshold = uiState.threshold,
-                        onBucketSelected = viewModel::selectBucket,
-                        baseCoin = uiState.selectedCoin
+                    LiquidationChartWebView(
+                        viewModel = viewModel,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(420.dp)
+                            .padding(horizontal = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
                     )
-                }
-
-                // Color scale legend
-                item { HeatmapLegend() }
-
-                // Selected bucket info
-                if (uiState.selectedBucketIndex >= 0) {
-                    val buckets = uiState.aggregatedData?.heatmapBuckets ?: emptyList()
-                    if (uiState.selectedBucketIndex < buckets.size) {
-                        item {
-                            BucketDetailCard(buckets[uiState.selectedBucketIndex], uiState.selectedCoin)
-                        }
-                    }
                 }
 
                 // Stats overview cards
@@ -242,6 +228,107 @@ fun LiquidationMapScreen(
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// WebView Chart — TradingView Lightweight Charts + Heatmap Overlay
+// ═══════════════════════════════════════════════════════════════════════
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun LiquidationChartWebView(
+    viewModel: LiquidationMapViewModel,
+    modifier: Modifier = Modifier
+) {
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Observe lifecycle for WebView pause/resume
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> webView?.onPause()
+                Lifecycle.Event.ON_RESUME -> webView?.onResume()
+                Lifecycle.Event.ON_DESTROY -> {
+                    webView?.destroy()
+                    webView = null
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Collect chart commands and forward to WebView
+    LaunchedEffect(webView) {
+        val wv = webView ?: return@LaunchedEffect
+        viewModel.chartCommands.collect { cmd ->
+            val js = when (cmd) {
+                is ChartCommand.SetCandleData -> "setCandleData('${cmd.json.escapeForJs()}')"
+                is ChartCommand.UpdateCandle -> "updateCandle('${cmd.json.escapeForJs()}')"
+                is ChartCommand.SetHeatmap -> "setHeatmapData('${cmd.json.escapeForJs()}')"
+                is ChartCommand.SetMarkPrice -> "setMarkPrice(${cmd.price})"
+                is ChartCommand.SetPrecision -> "setPricePrecision(${cmd.precision}, ${cmd.minMove})"
+            }
+            wv.post { wv.evaluateJavascript(js, null) }
+        }
+    }
+
+    AndroidView(
+        factory = { context ->
+            WebView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    allowFileAccess = true
+                    useWideViewPort = true
+                    loadWithOverviewMode = true
+                    setSupportZoom(false)
+                    builtInZoomControls = false
+                    displayZoomControls = false
+                    mediaPlaybackRequiresUserGesture = false
+                }
+                setBackgroundColor(android.graphics.Color.BLACK)
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+
+                webChromeClient = WebChromeClient()
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        viewModel.onChartReady()
+                    }
+                }
+
+                addJavascriptInterface(object {
+                    @JavascriptInterface
+                    fun onTimeframeChanged(tf: String) {
+                        viewModel.setTimeFilter(tf)
+                    }
+                }, "AndroidBridge")
+
+                loadUrl("file:///android_asset/liquidation_chart.html")
+                webView = this
+            }
+        },
+        modifier = modifier
+    )
+}
+
+/** Escape JSON string for safe JS injection */
+private fun String.escapeForJs(): String {
+    return this
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -319,391 +406,6 @@ private fun TimeFilterRow(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Heatmap Canvas Card
-// ═══════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun HeatmapCard(
-    buckets: List<HeatmapBucket>,
-    markPrice: Double,
-    selectedIndex: Int,
-    threshold: Float,
-    onBucketSelected: (Int) -> Unit,
-    baseCoin: String
-) {
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color(0xFF0D0A00)
-        )
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "$baseCoin ${stringResource(R.string.liquidation_subtitle)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Color.White
-                )
-                if (markPrice > 0) {
-                    Text(
-                        "$${formatNumber(markPrice)}",
-                        color = CoinLabGold,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Canvas heatmap
-            val density = LocalDensity.current
-            val thresholdValue = threshold
-
-            if (buckets.isNotEmpty()) {
-                val maxLiqValue = remember(buckets) {
-                    buckets.maxOfOrNull { it.totalLiquidationUsd } ?: 1.0
-                }
-
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(HeatmapNeutral)
-                        .pointerInput(buckets) {
-                            detectTapGestures { offset ->
-                                val bucketHeight = size.height.toFloat() / buckets.size
-                                val index = ((size.height - offset.y) / bucketHeight).toInt()
-                                    .coerceIn(0, buckets.size - 1)
-                                onBucketSelected(index)
-                            }
-                        }
-                ) {
-                    drawHeatmap(buckets, markPrice, maxLiqValue, selectedIndex, thresholdValue)
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(HeatmapNeutral),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Heatmap verisi bulunamadı",
-                        color = HeatmapText,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun DrawScope.drawHeatmap(
-    buckets: List<HeatmapBucket>,
-    markPrice: Double,
-    maxLiqValue: Double,
-    selectedIndex: Int,
-    threshold: Float
-) {
-    val leftPadding = 70f
-    val rightPadding = 20f
-    val topPadding = 10f
-    val bottomPadding = 10f
-
-    val chartWidth = size.width - leftPadding - rightPadding
-    val chartHeight = size.height - topPadding - bottomPadding
-    val bucketHeight = chartHeight / buckets.size
-    val halfWidth = chartWidth / 2f
-
-    val thresholdMultiplier = if (maxLiqValue > 0) maxLiqValue * (1f - threshold) else 1.0
-
-    // Draw grid lines
-    for (i in buckets.indices step 5) {
-        val y = topPadding + chartHeight - (i * bucketHeight) - bucketHeight / 2
-        drawLine(
-            color = HeatmapGrid,
-            start = Offset(leftPadding, y),
-            end = Offset(size.width - rightPadding, y),
-            strokeWidth = 0.5f
-        )
-    }
-
-    // Center line
-    drawLine(
-        color = HeatmapGrid.copy(alpha = 0.5f),
-        start = Offset(leftPadding + halfWidth, topPadding),
-        end = Offset(leftPadding + halfWidth, topPadding + chartHeight),
-        strokeWidth = 1f
-    )
-
-    // Draw buckets
-    buckets.forEachIndexed { index, bucket ->
-        val y = topPadding + chartHeight - ((index + 1) * bucketHeight)
-
-        // Long liquidation bar (right side, green)
-        val longNorm = if (thresholdMultiplier > 0)
-            (bucket.longLiquidationUsd / thresholdMultiplier).coerceIn(0.0, 1.0).toFloat()
-        else 0f
-
-        if (longNorm > 0.01f) {
-            val color = lerpColor(HeatmapLongLow, HeatmapLongMid, HeatmapLongHigh, longNorm)
-            drawRect(
-                color = color,
-                topLeft = Offset(leftPadding + halfWidth, y),
-                size = Size(halfWidth * longNorm, bucketHeight - 1f)
-            )
-        }
-
-        // Short liquidation bar (left side, red)
-        val shortNorm = if (thresholdMultiplier > 0)
-            (bucket.shortLiquidationUsd / thresholdMultiplier).coerceIn(0.0, 1.0).toFloat()
-        else 0f
-
-        if (shortNorm > 0.01f) {
-            val color = lerpColor(HeatmapShortLow, HeatmapShortMid, HeatmapShortHigh, shortNorm)
-            val barWidth = halfWidth * shortNorm
-            drawRect(
-                color = color,
-                topLeft = Offset(leftPadding + halfWidth - barWidth, y),
-                size = Size(barWidth, bucketHeight - 1f)
-            )
-        }
-
-        // Selected highlight
-        if (index == selectedIndex) {
-            drawRect(
-                color = CoinLabGold.copy(alpha = 0.3f),
-                topLeft = Offset(leftPadding, y),
-                size = Size(chartWidth, bucketHeight),
-                style = Stroke(width = 2f)
-            )
-        }
-
-        // Price labels (every 5th bucket)
-        if (index % 5 == 0) {
-            drawContext.canvas.nativeCanvas.drawText(
-                "$${formatPriceLabel(bucket.priceLevel)}",
-                8f,
-                y + bucketHeight / 2 + 4f,
-                android.graphics.Paint().apply {
-                    color = 0xFF8888AA.toInt()
-                    textSize = 22f
-                    isAntiAlias = true
-                }
-            )
-        }
-    }
-
-    // Mark price horizontal line
-    if (markPrice > 0 && buckets.isNotEmpty()) {
-        val minP = buckets.minOf { it.priceLow }
-        val maxP = buckets.maxOf { it.priceHigh }
-        if (markPrice in minP..maxP) {
-            val fraction = ((markPrice - minP) / (maxP - minP)).toFloat()
-            val markY = topPadding + chartHeight - (fraction * chartHeight)
-
-            // Dashed line effect
-            val dashLength = 8f
-            val gapLength = 4f
-            var x = leftPadding
-            while (x < size.width - rightPadding) {
-                drawLine(
-                    color = HeatmapMarkLine,
-                    start = Offset(x, markY),
-                    end = Offset((x + dashLength).coerceAtMost(size.width - rightPadding), markY),
-                    strokeWidth = 2f
-                )
-                x += dashLength + gapLength
-            }
-
-            // Mark price label
-            drawContext.canvas.nativeCanvas.drawText(
-                "► $${formatPriceLabel(markPrice)}",
-                leftPadding + chartWidth - 120f,
-                markY - 6f,
-                android.graphics.Paint().apply {
-                    color = 0xFFFFC107.toInt()
-                    textSize = 24f
-                    isFakeBoldText = true
-                    isAntiAlias = true
-                }
-            )
-        }
-    }
-
-    // Axis labels
-    drawContext.canvas.nativeCanvas.apply {
-        val shortLabel = "SHORT"
-        val longLabel = "LONG"
-        val labelPaint = android.graphics.Paint().apply {
-            color = 0xFF8888AA.toInt()
-            textSize = 20f
-            isAntiAlias = true
-        }
-        drawText(shortLabel, leftPadding + halfWidth * 0.3f, size.height - 2f, labelPaint)
-        drawText(longLabel, leftPadding + halfWidth + halfWidth * 0.3f, size.height - 2f, labelPaint)
-    }
-}
-
-private fun lerpColor(low: Color, mid: Color, high: Color, t: Float): Color {
-    return if (t < 0.5f) {
-        val f = t * 2f
-        Color(
-            red = low.red + (mid.red - low.red) * f,
-            green = low.green + (mid.green - low.green) * f,
-            blue = low.blue + (mid.blue - low.blue) * f,
-            alpha = 0.4f + t * 0.6f
-        )
-    } else {
-        val f = (t - 0.5f) * 2f
-        Color(
-            red = mid.red + (high.red - mid.red) * f,
-            green = mid.green + (high.green - mid.green) * f,
-            blue = mid.blue + (high.blue - mid.blue) * f,
-            alpha = 0.7f + t * 0.3f
-        )
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Heatmap Legend
-// ═══════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun HeatmapLegend() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Short side
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(HeatmapShortLow, HeatmapShortMid, HeatmapShortHigh)
-                        )
-                    )
-            )
-            Spacer(Modifier.width(6.dp))
-            Text("Short Liq.", color = HeatmapShortMid, fontSize = 11.sp)
-        }
-
-        Text(
-            "← Yoğunluk →",
-            color = HeatmapText,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium
-        )
-
-        // Long side
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Long Liq.", color = HeatmapLongMid, fontSize = 11.sp)
-            Spacer(Modifier.width(6.dp))
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(HeatmapLongLow, HeatmapLongMid, HeatmapLongHigh)
-                        )
-                    )
-            )
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Bucket Detail Card
-// ═══════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun BucketDetailCard(bucket: HeatmapBucket, baseCoin: String) {
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color(0xFF1A1400)
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    "Fiyat Seviyesi",
-                    color = HeatmapText,
-                    fontSize = 12.sp
-                )
-                Text(
-                    "$${formatNumber(bucket.priceLevel)}",
-                    color = CoinLabGold,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Long Likidasyon", color = HeatmapLongMid, fontSize = 11.sp)
-                    Text(
-                        "$${formatCompact(bucket.longLiquidationUsd)}",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("Short Likidasyon", color = HeatmapShortMid, fontSize = 11.sp)
-                    Text(
-                        "$${formatCompact(bucket.shortLiquidationUsd)}",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-            if (bucket.isEstimated) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "⚠ ${stringResource(R.string.liquidation_estimated)}",
-                    color = CoinLabGold.copy(alpha = 0.7f),
-                    fontSize = 11.sp
-                )
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 // Stats Overview Row
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -717,7 +419,6 @@ private fun StatsOverviewRow(uiState: LiquidationUiState) {
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Open Interest
         StatMiniCard(
             title = stringResource(R.string.liquidation_open_interest),
             value = "$${formatCompact(data.totalOpenInterestUsd)}",
@@ -726,7 +427,6 @@ private fun StatsOverviewRow(uiState: LiquidationUiState) {
             modifier = Modifier.weight(1f)
         )
 
-        // Funding Rate
         val fundingColor = if (data.aggregatedFundingRate >= 0) SparklineGreen else CoinLabRed
         StatMiniCard(
             title = stringResource(R.string.liquidation_funding_rate),
@@ -801,7 +501,6 @@ private fun LongShortCard(longRatio: Double, shortRatio: Double) {
             )
             Spacer(Modifier.height(12.dp))
 
-            // Ratio bar
             val longPct = (longRatio * 100).roundToInt()
             val shortPct = (shortRatio * 100).roundToInt()
 
@@ -810,12 +509,7 @@ private fun LongShortCard(longRatio: Double, shortRatio: Double) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.TrendingUp,
-                        null,
-                        tint = SparklineGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SparklineGreen, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Long", color = SparklineGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.width(4.dp))
@@ -826,18 +520,12 @@ private fun LongShortCard(longRatio: Double, shortRatio: Double) {
                     Spacer(Modifier.width(4.dp))
                     Text("Short", color = CoinLabRed, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.AutoMirrored.Filled.TrendingDown,
-                        null,
-                        tint = CoinLabRed,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.AutoMirrored.Filled.TrendingDown, null, tint = CoinLabRed, modifier = Modifier.size(16.dp))
                 }
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -934,7 +622,6 @@ private fun ExchangeBreakdownCard(exchanges: List<ExchangeData>) {
                             fontSize = 13.sp,
                             modifier = Modifier.width(60.dp)
                         )
-                        // OI bar
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -962,7 +649,6 @@ private fun ExchangeBreakdownCard(exchanges: List<ExchangeData>) {
                 }
             }
 
-            // Funding rates
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = HeatmapGrid, thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
@@ -974,11 +660,7 @@ private fun ExchangeBreakdownCard(exchanges: List<ExchangeData>) {
                 exchanges.forEach { ex ->
                     val fundColor = if (ex.fundingRate >= 0) SparklineGreen else CoinLabRed
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            ex.exchange.take(3),
-                            color = HeatmapText,
-                            fontSize = 10.sp
-                        )
+                        Text(ex.exchange.take(3), color = HeatmapText, fontSize = 10.sp)
                         Text(
                             "${String.format("%.3f", ex.fundingRate * 100)}%",
                             color = fundColor,
@@ -1018,33 +700,15 @@ private fun LiquidationEventRow(event: LiquidationEvent, baseCoin: String) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    sideIcon,
-                    contentDescription = null,
-                    tint = sideColor,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(sideIcon, contentDescription = null, tint = sideColor, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Row {
-                        Text(
-                            sideText,
-                            color = sideColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(sideText, color = sideColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(6.dp))
-                        Text(
-                            event.exchange,
-                            color = HeatmapText,
-                            fontSize = 11.sp
-                        )
+                        Text(event.exchange, color = HeatmapText, fontSize = 11.sp)
                     }
-                    Text(
-                        "$${formatNumber(event.price)}",
-                        color = Color.White,
-                        fontSize = 13.sp
-                    )
+                    Text("$${formatNumber(event.price)}", color = Color.White, fontSize = 13.sp)
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -1086,14 +750,5 @@ private fun formatCompact(value: Double): String {
         value >= 1_000 -> String.format("%.1fK", value / 1_000)
         value >= 1 -> String.format("%.0f", value)
         else -> String.format("%.2f", value)
-    }
-}
-
-private fun formatPriceLabel(price: Double): String {
-    return when {
-        price >= 10000 -> String.format("%.0f", price)
-        price >= 100 -> String.format("%.1f", price)
-        price >= 1 -> String.format("%.2f", price)
-        else -> String.format("%.4f", price)
     }
 }

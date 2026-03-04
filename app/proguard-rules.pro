@@ -94,6 +94,31 @@
 -keep class com.coinlab.app.data.remote.HardcodedCoinFallback$FallbackCoinEntry { *; }
 -keep class com.coinlab.app.data.remote.BinanceCoinMapper { *; }
 
+# v12.1 — Liquidation Map WebSocket models
+-keep class com.coinlab.app.data.remote.websocket.FuturesLiquidation { *; }
+-keep class com.coinlab.app.data.remote.websocket.FuturesKlineUpdate { *; }
+-keep class com.coinlab.app.data.remote.websocket.FuturesMarkPrice { *; }
+-keep class com.coinlab.app.data.remote.websocket.FuturesWsEvent { *; }
+-keep class com.coinlab.app.data.remote.websocket.FuturesWsEvent$* { *; }
+
+# v12.1 — Liquidation API DTOs (all exchange models)
+-keep class com.coinlab.app.data.remote.api.** { *; }
+
+# v12.1 — Liquidation Repository domain models
+-keep class com.coinlab.app.data.remote.firebase.CandleData { *; }
+-keep class com.coinlab.app.data.remote.firebase.DepthLevel { *; }
+-keep class com.coinlab.app.data.remote.firebase.LeverageTier { *; }
+-keep class com.coinlab.app.data.remote.firebase.HeatmapBucket { *; }
+-keep class com.coinlab.app.data.remote.firebase.AggregatedLiquidationData { *; }
+-keep class com.coinlab.app.data.remote.firebase.ExchangeData { *; }
+-keep class com.coinlab.app.data.remote.firebase.LiquidationEvent { *; }
+
+# v12.1 — WebView JavaScript Interface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes JavascriptInterface
+
 # v8.9.2 — Firebase Realtime Database models
 -keep class com.coinlab.app.data.remote.firebase.model.** { *; }
 -keepclassmembers class com.coinlab.app.data.remote.firebase.model.** {

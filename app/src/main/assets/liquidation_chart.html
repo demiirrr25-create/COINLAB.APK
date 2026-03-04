@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CoinLab Liquidation Heatmap</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%;
+    background: #000000;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+#chart-container {
+    width: 100%; height: 100%;
+    position: relative;
+}
+#heatmap-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+/* Crosshair tooltip */
+#tooltip {
+    display: none;
+    position: absolute;
+    z-index: 100;
+    padding: 10px 14px;
+    background: rgba(13, 10, 0, 0.95);
+    border: 1px solid rgba(247, 147, 26, 0.5);
+    border-radius: 8px;
+    color: #F0E6D2;
+    font-size: 12px;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    max-width: 220px;
+    line-height: 1.5;
+}
+#tooltip .tip-title {
+    color: #FFC107;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+#tooltip .tip-long { color: #00C853; }
+#tooltip .tip-short { color: #FF1744; }
+#tooltip .tip-label { color: #9A8B6E; font-size: 11px; }
+/* Watermark */
+#watermark {
+    position: absolute;
+    bottom: 8px; right: 12px;
+    color: rgba(247, 147, 26, 0.15);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    pointer-events: none;
+    z-index: 2;
+}
+/* Loading overlay */
+#loading {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    transition: opacity 0.3s;
+}
+#loading.hidden { opacity: 0; pointer-events: none; }
+.spinner {
+    width: 32px; height: 32px;
+    border: 3px solid rgba(247, 147, 26, 0.2);
+    border-top-color: #F7931A;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Legend */
+#legend {
+    position: absolute;
+    top: 8px; right: 12px;
+    z-index: 50;
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    color: #9A8B6E;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+}
+</style>
+</head>
+<body>
+<div id="chart-container">
+    <canvas id="heatmap-canvas"></canvas>
+    <div id="tooltip"></div>
+    <div id="watermark">COINLAB</div>
+    <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#00C853"></div>Long Liq.</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF1744"></div>Short Liq.</div>
+    </div>
+    <div id="loading"><div class="spinner"></div></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// CoinLab Professional Liquidation Heatmap Engine v12.1
+// TradingView Lightweight Charts + Custom Heatmap Overlay
+// ═══════════════════════════════════════════════════════════════
+
+const EXCHANGE_WEIGHTS = { Binance: 0.35, Bybit: 0.25, OKX: 0.20, Bitget: 0.10, 'Gate.io': 0.10 };
+
+// Heatmap color scale: purple → blue → green → yellow → red
+const HEATMAP_COLORS = [
+    { stop: 0.0, r: 75,  g: 0,   b: 130 },   // Purple (low)
+    { stop: 0.25, r: 0,   g: 100, b: 200 },   // Blue
+    { stop: 0.50, r: 0,   g: 200, b: 83  },   // Green
+    { stop: 0.75, r: 255, g: 193, b: 7   },   // Yellow
+    { stop: 1.0, r: 255, g: 23,  b: 68  }    // Red (extreme)
+];
+
+let chart = null;
+let candleSeries = null;
+let volumeSeries = null;
+let heatmapCanvas = null;
+let heatmapCtx = null;
+let currentHeatmapData = [];
+let currentCandleData = [];
+let markPrice = 0;
+let animationFrameId = null;
+let isReady = false;
+
+// ─── Chart Initialization ─────────────────────────────────────
+
+function initChart() {
+    const container = document.getElementById('chart-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    chart = LightweightCharts.createChart(container, {
+        width: width,
+        height: height,
+        layout: {
+            background: { type: 'solid', color: '#000000' },
+            textColor: '#9A8B6E',
+            fontSize: 11,
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+        },
+        grid: {
+            vertLines: { color: 'rgba(42, 32, 16, 0.5)', style: 1 },
+            horzLines: { color: 'rgba(42, 32, 16, 0.5)', style: 1 }
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+            vertLine: {
+                color: 'rgba(247, 147, 26, 0.4)',
+                width: 1,
+                style: 2,
+                labelBackgroundColor: '#F7931A'
+            },
+            horzLine: {
+                color: 'rgba(247, 147, 26, 0.4)',
+                width: 1,
+                style: 2,
+                labelBackgroundColor: '#F7931A'
+            }
+        },
+        rightPriceScale: {
+            borderColor: 'rgba(42, 32, 16, 0.5)',
+            scaleMargins: { top: 0.05, bottom: 0.25 },
+            textColor: '#9A8B6E'
+        },
+        timeScale: {
+            borderColor: 'rgba(42, 32, 16, 0.5)',
+            timeVisible: true,
+            secondsVisible: false,
+            barSpacing: 8,
+            minBarSpacing: 4
+        },
+        handleScroll: { vertTouchDrag: true },
+        handleScale: { axisPressedMouseMove: true, pinchToZoom: true }
+    });
+
+    // Candlestick series
+    candleSeries = chart.addCandlestickSeries({
+        upColor: '#00C853',
+        downColor: '#FF1744',
+        borderUpColor: '#00C853',
+        borderDownColor: '#FF1744',
+        wickUpColor: '#00C853',
+        wickDownColor: '#FF1744',
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
+    });
+
+    // Volume series
+    volumeSeries = chart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+        color: 'rgba(247, 147, 26, 0.2)'
+    });
+    chart.priceScale('volume').applyOptions({
+        scaleMargins: { top: 0.85, bottom: 0 }
+    });
+
+    // Heatmap canvas setup
+    heatmapCanvas = document.getElementById('heatmap-canvas');
+    heatmapCanvas.width = width * window.devicePixelRatio;
+    heatmapCanvas.height = height * window.devicePixelRatio;
+    heatmapCanvas.style.width = width + 'px';
+    heatmapCanvas.style.height = height + 'px';
+    heatmapCtx = heatmapCanvas.getContext('2d');
+    heatmapCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    // Crosshair tooltip
+    chart.subscribeCrosshairMove(onCrosshairMove);
+
+    // Resize handler
+    const resizeObserver = new ResizeObserver(entries => {
+        const { width: w, height: h } = entries[0].contentRect;
+        chart.applyOptions({ width: w, height: h });
+        heatmapCanvas.width = w * window.devicePixelRatio;
+        heatmapCanvas.height = h * window.devicePixelRatio;
+        heatmapCanvas.style.width = w + 'px';
+        heatmapCanvas.style.height = h + 'px';
+        heatmapCtx = heatmapCanvas.getContext('2d');
+        heatmapCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        renderHeatmap();
+    });
+    resizeObserver.observe(container);
+
+    // Re-render heatmap on chart scroll/zoom
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        requestAnimationFrame(renderHeatmap);
+    });
+    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+        requestAnimationFrame(renderHeatmap);
+    });
+
+    isReady = true;
+    document.getElementById('loading').classList.add('hidden');
+}
+
+// ─── Crosshair Tooltip ────────────────────────────────────────
+
+function onCrosshairMove(param) {
+    const tooltip = document.getElementById('tooltip');
+    if (!param || !param.point || !param.time) {
+        tooltip.style.display = 'none';
+        return;
+    }
+
+    const price = param.seriesData?.get(candleSeries);
+    if (!price) {
+        tooltip.style.display = 'none';
+        return;
+    }
+
+    // Find heatmap data at this price level
+    const hoverPrice = (price.high + price.low) / 2;
+    const bucket = findBucketAtPrice(hoverPrice);
+
+    let html = `<div class="tip-title">${formatPrice(price.close)}</div>`;
+    html += `<div><span class="tip-label">O:</span> ${formatPrice(price.open)} <span class="tip-label">H:</span> ${formatPrice(price.high)}</div>`;
+    html += `<div><span class="tip-label">L:</span> ${formatPrice(price.low)} <span class="tip-label">C:</span> ${formatPrice(price.close)}</div>`;
+
+    if (bucket) {
+        const intensity = bucket.normalizedDensity;
+        html += `<div style="margin-top:6px;border-top:1px solid rgba(247,147,26,0.2);padding-top:6px">`;
+        html += `<div class="tip-label">Likidasyon Yoğunluğu: ${(intensity * 100).toFixed(1)}%</div>`;
+        html += `<div class="tip-long">▲ Long: $${formatCompact(bucket.longUsd)}</div>`;
+        html += `<div class="tip-short">▼ Short: $${formatCompact(bucket.shortUsd)}</div>`;
+        html += `</div>`;
+    }
+
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+
+    const container = document.getElementById('chart-container');
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    let x = param.point.x + 16;
+    let y = param.point.y - 10;
+    if (x + 230 > cw) x = param.point.x - 230;
+    if (y + 120 > ch) y = ch - 130;
+    if (y < 0) y = 8;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+// ─── Heatmap Rendering Engine (GPU-accelerated Canvas) ────────
+
+function renderHeatmap() {
+    if (!heatmapCtx || !chart || currentHeatmapData.length === 0) return;
+
+    const container = document.getElementById('chart-container');
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    heatmapCtx.clearRect(0, 0, w, h);
+
+    const priceScale = chart.priceScale('right');
+    const timeScale = chart.timeScale();
+    const visibleRange = timeScale.getVisibleLogicalRange();
+    if (!visibleRange) return;
+
+    // Get price range from visible candles
+    const visibleData = currentCandleData.filter((_, i) =>
+        i >= Math.floor(visibleRange.from) && i <= Math.ceil(visibleRange.to)
+    );
+    if (visibleData.length === 0) return;
+
+    const visibleHigh = Math.max(...visibleData.map(d => d.high));
+    const visibleLow = Math.min(...visibleData.map(d => d.low));
+    const priceRange = visibleHigh - visibleLow;
+    if (priceRange <= 0) return;
+
+    // Extend heatmap range slightly beyond visible
+    const extendedHigh = visibleHigh + priceRange * 0.05;
+    const extendedLow = visibleLow - priceRange * 0.05;
+
+    // Calculate pixel coordinates for price levels
+    const rightPanelWidth = 65;
+    const chartWidth = w - rightPanelWidth;
+    const topMargin = h * 0.05;
+    const bottomMargin = h * 0.30; // account for volume area + time axis
+    const chartHeight = h - topMargin - bottomMargin;
+
+    // Find max density for normalization
+    const maxDensity = Math.max(...currentHeatmapData.map(b => b.totalUsd), 1);
+
+    // Render heatmap buckets as horizontal bands
+    const numBuckets = currentHeatmapData.length;
+
+    for (let i = 0; i < numBuckets; i++) {
+        const bucket = currentHeatmapData[i];
+        if (bucket.priceLevel < extendedLow || bucket.priceLevel > extendedHigh) continue;
+
+        const normalizedDensity = bucket.totalUsd / maxDensity;
+        if (normalizedDensity < 0.02) continue;
+
+        const priceFraction = (bucket.priceLevel - extendedLow) / (extendedHigh - extendedLow);
+        const y = topMargin + chartHeight * (1 - priceFraction);
+        const bandHeight = Math.max(chartHeight / numBuckets * 1.2, 3);
+
+        // Get color from heatmap scale
+        const color = getHeatmapColor(normalizedDensity);
+        const alpha = 0.15 + normalizedDensity * 0.55;
+
+        // Draw the heatmap band across the full chart width
+        heatmapCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+        heatmapCtx.fillRect(0, y - bandHeight / 2, chartWidth, bandHeight);
+
+        // Add glow effect for high density bands
+        if (normalizedDensity > 0.5) {
+            const glowAlpha = (normalizedDensity - 0.5) * 0.3;
+            heatmapCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${glowAlpha})`;
+            heatmapCtx.fillRect(0, y - bandHeight, chartWidth, bandHeight * 2);
+        }
+    }
+
+    // Draw mark price horizontal line
+    if (markPrice > extendedLow && markPrice < extendedHigh) {
+        const markFraction = (markPrice - extendedLow) / (extendedHigh - extendedLow);
+        const markY = topMargin + chartHeight * (1 - markFraction);
+
+        heatmapCtx.save();
+        heatmapCtx.setLineDash([6, 4]);
+        heatmapCtx.strokeStyle = 'rgba(255, 193, 7, 0.6)';
+        heatmapCtx.lineWidth = 1;
+        heatmapCtx.beginPath();
+        heatmapCtx.moveTo(0, markY);
+        heatmapCtx.lineTo(chartWidth, markY);
+        heatmapCtx.stroke();
+        heatmapCtx.restore();
+    }
+}
+
+function getHeatmapColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    let lower = HEATMAP_COLORS[0], upper = HEATMAP_COLORS[HEATMAP_COLORS.length - 1];
+    for (let i = 0; i < HEATMAP_COLORS.length - 1; i++) {
+        if (t >= HEATMAP_COLORS[i].stop && t <= HEATMAP_COLORS[i + 1].stop) {
+            lower = HEATMAP_COLORS[i];
+            upper = HEATMAP_COLORS[i + 1];
+            break;
+        }
+    }
+    const range = upper.stop - lower.stop;
+    const f = range > 0 ? (t - lower.stop) / range : 0;
+    return {
+        r: Math.round(lower.r + (upper.r - lower.r) * f),
+        g: Math.round(lower.g + (upper.g - lower.g) * f),
+        b: Math.round(lower.b + (upper.b - lower.b) * f)
+    };
+}
+
+function findBucketAtPrice(price) {
+    if (currentHeatmapData.length === 0) return null;
+    let closest = null;
+    let minDist = Infinity;
+    for (const bucket of currentHeatmapData) {
+        const dist = Math.abs(bucket.priceLevel - price);
+        if (dist < minDist) {
+            minDist = dist;
+            closest = bucket;
+        }
+    }
+    return closest;
+}
+
+// ─── Data Interface (called from Android) ─────────────────────
+
+function setCandleData(jsonStr) {
+    try {
+        const data = JSON.parse(jsonStr);
+        if (!data || data.length === 0) return;
+
+        currentCandleData = data;
+
+        // Set candle data
+        const candles = data.map(d => ({
+            time: d.time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close
+        }));
+        candleSeries.setData(candles);
+
+        // Set volume data
+        const volumes = data.map(d => ({
+            time: d.time,
+            value: d.volume || 0,
+            color: d.close >= d.open
+                ? 'rgba(0, 200, 83, 0.3)'
+                : 'rgba(255, 23, 68, 0.3)'
+        }));
+        volumeSeries.setData(volumes);
+
+        chart.timeScale().fitContent();
+        requestAnimationFrame(renderHeatmap);
+    } catch(e) {
+        console.error('setCandleData error:', e);
+    }
+}
+
+function updateCandle(jsonStr) {
+    try {
+        const d = JSON.parse(jsonStr);
+        candleSeries.update({
+            time: d.time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close
+        });
+        volumeSeries.update({
+            time: d.time,
+            value: d.volume || 0,
+            color: d.close >= d.open
+                ? 'rgba(0, 200, 83, 0.3)'
+                : 'rgba(255, 23, 68, 0.3)'
+        });
+        requestAnimationFrame(renderHeatmap);
+    } catch(e) {
+        console.error('updateCandle error:', e);
+    }
+}
+
+function setHeatmapData(jsonStr) {
+    try {
+        const data = JSON.parse(jsonStr);
+        if (!data || data.length === 0) return;
+
+        // Calculate max for normalization
+        const maxTotal = Math.max(...data.map(b => b.totalUsd), 1);
+        currentHeatmapData = data.map(b => ({
+            ...b,
+            normalizedDensity: b.totalUsd / maxTotal
+        }));
+
+        requestAnimationFrame(renderHeatmap);
+    } catch(e) {
+        console.error('setHeatmapData error:', e);
+    }
+}
+
+function setMarkPrice(price) {
+    markPrice = price;
+    requestAnimationFrame(renderHeatmap);
+}
+
+function setTimeframe(tf) {
+    // Notify Android to load new timeframe data
+    if (window.AndroidBridge) {
+        window.AndroidBridge.onTimeframeChanged(tf);
+    }
+}
+
+function setPricePrecision(precision, minMove) {
+    candleSeries.applyOptions({
+        priceFormat: { type: 'price', precision: precision, minMove: minMove }
+    });
+}
+
+// ─── Utility Functions ────────────────────────────────────────
+
+function formatPrice(p) {
+    if (p >= 10000) return '$' + p.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (p >= 100) return '$' + p.toFixed(1);
+    if (p >= 1) return '$' + p.toFixed(2);
+    return '$' + p.toFixed(4);
+}
+
+function formatCompact(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+    if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    return v.toFixed(0);
+}
+
+// ─── Initialize on load ───────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', initChart);
+window.addEventListener('resize', () => {
+    if (chart) {
+        const container = document.getElementById('chart-container');
+        chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+    }
+});
+</script>
+</body>
+</html>

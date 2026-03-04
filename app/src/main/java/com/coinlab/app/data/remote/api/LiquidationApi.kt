@@ -5,7 +5,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * v12.0 — Multi-exchange liquidation & futures data API interfaces.
+ * v12.1 — Multi-exchange liquidation & futures data API interfaces.
+ * Professional Coinglass-grade liquidation heatmap system.
  *
  * Uses public, no-auth-required endpoints from:
  *   - Binance Futures (fapi.binance.com)
@@ -74,6 +75,21 @@ interface BinanceFuturesApi {
     suspend fun getPremiumIndex(
         @Query("symbol") symbol: String
     ): BinancePremiumIndex
+
+    /** Kline / Candlestick data for chart */
+    @GET("fapi/v1/klines")
+    suspend fun getKlines(
+        @Query("symbol") symbol: String,
+        @Query("interval") interval: String = "1h",
+        @Query("limit") limit: Int = 500
+    ): List<List<Any>>
+
+    /** Orderbook depth */
+    @GET("fapi/v1/depth")
+    suspend fun getOrderbookDepth(
+        @Query("symbol") symbol: String,
+        @Query("limit") limit: Int = 50
+    ): BinanceOrderbook
 }
 
 // ─── Bybit ──────────────────────────────────────────────────────────────
@@ -236,6 +252,12 @@ data class BinancePremiumIndex(
     val indexPrice: String = "0",
     val lastFundingRate: String = "0",
     val nextFundingTime: Long = 0
+)
+
+data class BinanceOrderbook(
+    val lastUpdateId: Long = 0,
+    val bids: List<List<String>> = emptyList(),
+    val asks: List<List<String>> = emptyList()
 )
 
 // ─── Bybit DTOs ──────────────────────────────────────────────────────
