@@ -261,4 +261,18 @@
     <string name="quick_settings">Quick Settings</string>
     <string name="settings_desc">Theme, language, notifications</string>
     <string name="app_version_display">Version 7.5.2</string>
+
+    <!-- v9.5 - New Features -->
+    <string name="ai_assistant">AI Assistant</string>
+    <string name="ai_assistant_subtitle">Gemini Analysis</string>
+    <string name="prediction_game">Prediction Game</string>
+    <string name="prediction_game_subtitle">Price Prediction</string>
+    <string name="social_trading">Social Trading</string>
+    <string name="social_trading_subtitle">Signals</string>
+    <string name="messages">Messages</string>
+    <string name="messages_subtitle">P2P Chat</string>
+    <string name="channel_messages">Messages</string>
+    <string name="channel_messages_desc">P2P message notifications</string>
+    <string name="channel_trading">Trading Signals</string>
+    <string name="channel_trading_desc">Social trading signal notifications</string>
 </resources>

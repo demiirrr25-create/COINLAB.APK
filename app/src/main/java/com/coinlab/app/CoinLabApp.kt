@@ -15,6 +15,8 @@ import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import com.coinlab.app.data.remote.DynamicCoinRegistry
 import com.coinlab.app.worker.PriceAlertWorker
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +71,7 @@ class CoinLabApp : Application(), Configuration.Provider, ImageLoaderFactory {
         super.onCreate()
         createNotificationChannels()
         schedulePriceAlertWorker()
+        initializeFirebaseServices()
         // v7.9: Early-init DynamicCoinRegistry so market data is ready when user opens the screen
         appScope.launch {
             try {
@@ -115,8 +118,25 @@ class CoinLabApp : Application(), Configuration.Provider, ImageLoaderFactory {
             description = getString(R.string.channel_community_desc)
         }
 
+        val messagesChannel = NotificationChannel(
+            CHANNEL_MESSAGES,
+            "Mesajlar",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "P2P mesaj bildirimleri"
+            enableVibration(true)
+        }
+
+        val tradingChannel = NotificationChannel(
+            CHANNEL_TRADING_SIGNALS,
+            "Trading Sinyalleri",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Sosyal trading sinyal bildirimleri"
+        }
+
         manager.createNotificationChannels(
-            listOf(priceAlertChannel, portfolioChannel, newsChannel, communityChannel)
+            listOf(priceAlertChannel, portfolioChannel, newsChannel, communityChannel, messagesChannel, tradingChannel)
         )
         } catch (_: Exception) { }
     }
@@ -126,6 +146,8 @@ class CoinLabApp : Application(), Configuration.Provider, ImageLoaderFactory {
         const val CHANNEL_PORTFOLIO = "portfolio_updates"
         const val CHANNEL_NEWS = "crypto_news"
         const val CHANNEL_COMMUNITY = "community_notifications"
+        const val CHANNEL_MESSAGES = "messages"
+        const val CHANNEL_TRADING_SIGNALS = "trading_signals"
     }
 
     private fun schedulePriceAlertWorker() {
@@ -140,5 +162,22 @@ class CoinLabApp : Application(), Configuration.Provider, ImageLoaderFactory {
                 workRequest
             )
         } catch (_: Exception) { }
+    }
+
+    /**
+     * v9.5 — Initialize Firebase Remote Config + FCM topic subscriptions.
+     */
+    private fun initializeFirebaseServices() {
+        appScope.launch {
+            try {
+                // Fetch Remote Config (contains gemini_api_key etc.)
+                FirebaseRemoteConfig.getInstance().fetchAndActivate()
+            } catch (_: Exception) { }
+            try {
+                // Subscribe to general crypto alerts topic
+                FirebaseMessaging.getInstance().subscribeToTopic("crypto_alerts")
+                FirebaseMessaging.getInstance().subscribeToTopic("trading_signals")
+            } catch (_: Exception) { }
+        }
     }
 }

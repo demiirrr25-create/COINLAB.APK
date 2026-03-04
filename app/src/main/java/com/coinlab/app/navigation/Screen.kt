@@ -26,4 +26,13 @@ sealed class Screen(val route: String) {
     data object Profile : Screen("profile")
     data object Staking : Screen("staking")
     data object Wallet : Screen("wallet")
+
+    // v9.5 — New feature screens
+    data object AiAssistant : Screen("ai_assistant")
+    data object ChatList : Screen("chat_list")
+    data object Chat : Screen("chat/{chatId}") {
+        fun createRoute(chatId: String) = "chat/$chatId"
+    }
+    data object PredictionGame : Screen("prediction_game")
+    data object SocialTrading : Screen("social_trading")
 }

@@ -71,6 +71,11 @@ import com.coinlab.app.ui.settings.SettingsScreen
 import com.coinlab.app.ui.staking.StakingScreen
 import com.coinlab.app.ui.wallet.WalletScreen
 import com.coinlab.app.ui.web3.Web3Screen
+import com.coinlab.app.ui.ai.AiAssistantScreen
+import com.coinlab.app.ui.chat.ChatListScreen
+import com.coinlab.app.ui.chat.ChatScreen
+import com.coinlab.app.ui.prediction.PredictionGameScreen
+import com.coinlab.app.ui.trading.SocialTradingScreen
 import com.coinlab.app.ui.theme.CoinLabGreen
 
 data class BottomNavItem(
@@ -251,6 +256,18 @@ fun CoinLabNavHost(
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onAiAssistantClick = {
+                        navController.navigate(Screen.AiAssistant.route)
+                    },
+                    onPredictionClick = {
+                        navController.navigate(Screen.PredictionGame.route)
+                    },
+                    onTradingClick = {
+                        navController.navigate(Screen.SocialTrading.route)
+                    },
+                    onChatClick = {
+                        navController.navigate(Screen.ChatList.route)
                     }
                 )
             }
@@ -452,6 +469,49 @@ fun CoinLabNavHost(
                 }
             ) {
                 WalletScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v9.5 — AI Assistant
+            composable(Screen.AiAssistant.route) {
+                AiAssistantScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v9.5 — Chat List
+            composable(Screen.ChatList.route) {
+                ChatListScreen(
+                    onBack = { navController.popBackStack() },
+                    onChatClick = { chatId ->
+                        navController.navigate(Screen.Chat.createRoute(chatId))
+                    }
+                )
+            }
+
+            // v9.5 — Chat
+            composable(
+                route = Screen.Chat.route,
+                arguments = listOf(navArgument("chatId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val chatId = backStackEntry.arguments?.getString("chatId") ?: return@composable
+                ChatScreen(
+                    chatId = chatId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v9.5 — Prediction Game
+            composable(Screen.PredictionGame.route) {
+                PredictionGameScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v9.5 — Social Trading
+            composable(Screen.SocialTrading.route) {
+                SocialTradingScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

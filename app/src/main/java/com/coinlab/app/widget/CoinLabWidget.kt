@@ -104,7 +104,7 @@ private fun WidgetContent(coins: List<WidgetCoinData>) {
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = GlanceTheme.colors.primary
+                    color = ColorProvider(Color(0xFFF7931A)) // Bitcoin Gold
                 )
             )
             Spacer(modifier = GlanceModifier.defaultWeight())
@@ -112,7 +112,7 @@ private fun WidgetContent(coins: List<WidgetCoinData>) {
                 text = "CANLI",
                 style = TextStyle(
                     fontSize = 10.sp,
-                    color = ColorProvider(Color(0xFF4CAF50))
+                    color = ColorProvider(Color(0xFFFFC107)) // Amber Gold
                 )
             )
         }

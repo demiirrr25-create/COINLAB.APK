@@ -310,4 +310,18 @@
     <string name="channel_community">Topluluk Bildirimleri</string>
     <string name="channel_community_desc">Topluluk gönderileri, yorumlar ve etkileşimler</string>
     <string name="community_posts">Gönderiler</string>
+
+    <!-- v9.5 - New Features -->
+    <string name="ai_assistant">AI Asistan</string>
+    <string name="ai_assistant_subtitle">Gemini Analiz</string>
+    <string name="prediction_game">Tahmin Oyunu</string>
+    <string name="prediction_game_subtitle">Fiyat Tahmini</string>
+    <string name="social_trading">Sosyal Trading</string>
+    <string name="social_trading_subtitle">Sinyaller</string>
+    <string name="messages">Mesajlar</string>
+    <string name="messages_subtitle">P2P Sohbet</string>
+    <string name="channel_messages">Mesajlar</string>
+    <string name="channel_messages_desc">P2P mesaj bildirimleri</string>
+    <string name="channel_trading">Trading Sinyalleri</string>
+    <string name="channel_trading_desc">Sosyal trading sinyal bildirimleri</string>
 </resources>

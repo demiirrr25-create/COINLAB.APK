@@ -16,8 +16,8 @@ android {
         applicationId = "com.coinlab.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 44
-        versionName = "8.9.2"
+        versionCode = 45
+        versionName = "9.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -157,6 +157,11 @@ dependencies {
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.storage)
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.config)
+
+    // Google Generative AI (Gemini)
+    implementation(libs.generativeai)
 
     // Google Sign-In (Credential Manager)
     implementation(libs.credentials)
